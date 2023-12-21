@@ -1,0 +1,19 @@
+[package]
+name = "nsvb"
+version = "0.1.0"
+authors = ["Lucas Wells <lucas@silvxlabs.com>"]
+description = "A National-Scale Tree Volume, Biomass, and Carbon Modeling System for the United States"
+repository = "https://github.com/silvxlabs/nsvb"
+license = "MIT"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+argmin = "0.8.1"
+atty = "0.2.14"
+clap = { version = "4.4.11", features = ["derive"] }
+csv = "1.3.0"
+lazy_static = "1.4.0"
+serde = { version = "1.0.193", features = ["derive"] }
+serde_json = "1.0.108"
