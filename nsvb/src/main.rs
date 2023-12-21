@@ -36,7 +36,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut wtr = csv::Writer::from_writer(io::stdout());
 
     for tree in trees {
-        wtr.serialize(tree.process())?;
+        println!("{}", tree.get_gross_stem_volume());
+        // wtr.serialize(tree)?;
     }
 
     wtr.flush()?;

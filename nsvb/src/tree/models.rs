@@ -68,7 +68,7 @@ pub fn volume_ratio(z: f64, ht: f64, alpha: f64, beta: f64) -> f64 {
 }
 
 // Weight-volume models
-pub fn weight_volume(dia: f64, ht: f64, model: u8, coefs: Vec<f64>) -> f64 {
+pub fn weight_volume(dia: f64, ht: f64, model: u8, coefs: &Vec<f64>) -> f64 {
     match model {
         1 => schumacher_hall(dia, ht, coefs[0], coefs[1], coefs[2]),
         2 => segmented(dia, ht, coefs[0], coefs[1], coefs[2], coefs[3], coefs[4]),
