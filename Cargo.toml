@@ -1,0 +1,4 @@
+# This is required for the Rust language server to detect a Cargo.toml
+# not in the root directory
+[workspace]
+members = ["./nsvb",]

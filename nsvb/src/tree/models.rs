@@ -32,11 +32,9 @@ pub fn height_to_diameter(
     dia: f64,
     ht: f64,
     d_i: f64,
-    volob_coefs: Vec<f64>,
-    ratio_coefs: Vec<f64>,
+    volob_coefs: &Vec<f64>,
+    ratio_coefs: &Vec<f64>,
 ) -> f64 {
-    // let volob = species.volob.divisions.get(division).unwrap_or(&species.volob.divisions["default"]);
-    // let ratio = species.rcumob.divisions.get(division).unwrap_or(&species.rcumob.divisions["default"]);
     let ht_to_dia = HeightToDiameter {
         dia: dia,
         ht: ht,

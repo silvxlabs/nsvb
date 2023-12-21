@@ -1,5 +1,5 @@
 pub struct Decay {
-    properties: Vec<Vec<f32>>,
+    properties: Vec<Vec<f64>>,
 }
 
 impl Decay {
@@ -27,23 +27,23 @@ impl Decay {
         Decay { properties }
     }
 
-    pub fn get_wood_density_proportion(&self, decay_class: usize) -> Option<f32> {
+    pub fn get_wood_density_proportion(&self, decay_class: usize) -> Option<f64> {
         self.get_property(decay_class, DecayProperty::WoodDensityProportion)
     }
 
-    pub fn get_remaining_bark_proportion(&self, decay_class: usize) -> Option<f32> {
+    pub fn get_remaining_bark_proportion(&self, decay_class: usize) -> Option<f64> {
         self.get_property(decay_class, DecayProperty::RemainingBarkProportion)
     }
 
-    pub fn get_remaining_branch_proportion(&self, decay_class: usize) -> Option<f32> {
+    pub fn get_remaining_branch_proportion(&self, decay_class: usize) -> Option<f64> {
         self.get_property(decay_class, DecayProperty::RemainingBranchProportion)
     }
 
-    pub fn get_carbon_fraction(&self, decay_class: usize) -> Option<f32> {
+    pub fn get_carbon_fraction(&self, decay_class: usize) -> Option<f64> {
         self.get_property(decay_class, DecayProperty::CarbonFraction)
     }
 
-    fn get_property(&self, decay_class: usize, property: DecayProperty) -> Option<f32> {
+    fn get_property(&self, decay_class: usize, property: DecayProperty) -> Option<f64> {
         if decay_class == 0 || decay_class > self.properties.len() {
             None
         } else {

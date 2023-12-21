@@ -1,7 +1,9 @@
 use lazy_static::lazy_static;
+use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use serde_json::Result;
 use std::collections::HashMap;
+use std::fmt;
 
 mod coefs;
 
@@ -13,25 +15,19 @@ pub struct ModelData {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Division {
-    #[serde(flatten)]
-    pub divisions: HashMap<String, ModelData>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub struct Component {
     pub wdsg: f64,
     pub bksg: f64,
     pub cfrac: f64,
-    pub volib: Division,
-    pub volbk: Division,
-    pub volob: Division,
-    pub rcumob: Division,
-    pub rcumib: Division,
-    pub total_biomass: Division,
-    pub bark_biomass: Division,
-    pub branch_biomass: Division,
-    pub foliage_biomass: Division,
+    pub volib: HashMap<String, ModelData>,
+    pub volbk: HashMap<String, ModelData>,
+    pub volob: HashMap<String, ModelData>,
+    pub rcumob: HashMap<String, ModelData>,
+    pub rcumib: HashMap<String, ModelData>,
+    pub total_biomass: HashMap<String, ModelData>,
+    pub bark_biomass: HashMap<String, ModelData>,
+    pub branch_biomass: HashMap<String, ModelData>,
+    pub foliage_biomass: HashMap<String, ModelData>,
 }
 
 type SpeciesMap = HashMap<String, Component>;
