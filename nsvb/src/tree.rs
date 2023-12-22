@@ -274,6 +274,7 @@ mod tests {
         let v_tot_ob_sound = v_tot_ib_sound + v_tot_bk_gross;
         assert_approx_eq!(v_tot_ob_sound, 101.643711776594, 1e-2);
 
+        // Step 7
         let w_tot_ib = v_tot_ib_gross * wood_specief_gravity(spcd) * 62.4;
         assert_approx_eq!(w_tot_ib, 2483.739897283610, 1e-2);
         let w_tot_ib_red = v_tot_ib_gross
@@ -282,66 +283,63 @@ mod tests {
             * 62.4;
         assert_approx_eq!(w_tot_ib_red, 2483.739897283610, 1e-2);
 
+        // Step 8
         let w_tot_bk = stem_bark_biomass(spcd, division, dia, ht);
         assert_approx_eq!(w_tot_bk, 361.782496100100, 1e-2);
 
+        // Step 9
         let w_branch = branch_biomass(spcd, division, dia, ht);
         assert_approx_eq!(w_branch, 277.487756904646, 1e-2);
 
+        // Step 10
         let abg_predicted = above_groud_biomass(spcd, division, dia, ht);
         assert_approx_eq!(abg_predicted, 3154.5539926725, 1e-2);
-
         let agb_component_red = w_tot_ib_red + w_tot_bk + w_branch;
         assert_approx_eq!(agb_component_red, 3123.010150288360, 1e-2);
 
+        // Step 11
         let agb_reduce = agb_component_red / (w_tot_ib + w_tot_bk + w_branch);
         assert_approx_eq!(agb_reduce, 1.000000000000, 1e-2);
-
         let agb_predicted_red = abg_predicted * agb_reduce;
         assert_approx_eq!(agb_predicted_red, 3154.5539926725, 1e-2);
-
         let agb_diff = agb_predicted_red - agb_component_red;
         assert_approx_eq!(agb_diff, 31.543842384153, 1e-2);
 
+        // Step 12
         let wood_harmonized = agb_predicted_red * (w_tot_ib_red / agb_component_red);
         assert_approx_eq!(wood_harmonized, 2508.826815376370, 1e-2);
-
         let bark_harmonized = agb_predicted_red * (w_tot_bk / agb_component_red);
         assert_approx_eq!(bark_harmonized, 365.436666110811, 1e-2);
-
         let branch_harmonized = agb_predicted_red * (w_branch / agb_component_red);
         assert_approx_eq!(branch_harmonized, 280.290511185328, 1e-2);
 
-        let w_foliage = foilage_biomass(spcd, division, dia, ht);
-        assert_approx_eq!(w_foliage, 83.634788855934, 1e-2);
-
+        // Step 13
         let wdsg_adj = wood_harmonized / v_tot_ib_sound / 62.4;
         assert_approx_eq!(wdsg_adj, 0.454545207473, 1e-2);
-
-        let bksg_adj = bark_harmonized / v_tot_bk_gross / 62.4;
-        assert_approx_eq!(bksg_adj, 0.4439514186, 1e-2);
-
         let w_mer_ib = v_mer_ib_gross * wdsg_adj * 62.4;
         assert_approx_eq!(w_mer_ib, 2431.57468351127, 1e-2);
-
-        let w_mer_bk = v_mer_bk_gross * bksg_adj * 62.4;
-        assert_approx_eq!(w_mer_bk, 354.184091263592, 1e-2);
-
-        let w_mer_ob = w_mer_ib + w_mer_bk;
-        assert_approx_eq!(w_mer_ob, 2785.75877477486, 1e-2);
-
         let w_stump_ib = v_stump_ib_gross * wdsg_adj * 62.4;
         assert_approx_eq!(w_stump_ib, 60.709367768006, 1e-2);
 
+        // Step 14
+        let bksg_adj = bark_harmonized / v_tot_bk_gross / 62.4;
+        assert_approx_eq!(bksg_adj, 0.4439514186, 1e-2);
+        let w_mer_bk = v_mer_bk_gross * bksg_adj * 62.4;
+        assert_approx_eq!(w_mer_bk, 354.184091263592, 1e-2);
         let w_stump_bk = v_stump_bk_gross * bksg_adj * 62.4;
         assert_approx_eq!(w_stump_bk, 8.842949550309, 1e-2);
-
+        let w_mer_ob = w_mer_ib + w_mer_bk;
+        assert_approx_eq!(w_mer_ob, 2785.75877477486, 1e-2);
         let w_stump_ob = w_stump_ib + w_stump_bk;
         assert_approx_eq!(w_stump_ob, 69.552317318315, 1e-2);
-
         let drybio_top = agb_predicted_red - w_mer_ob - w_stump_ob;
         assert_approx_eq!(drybio_top, 299.242900579325, 1e-2);
 
+        // Step 15
+        let w_foliage = foilage_biomass(spcd, division, dia, ht);
+        assert_approx_eq!(w_foliage, 83.634788855934, 1e-2);
+
+        // Step 16
         let c = agb_predicted_red * carbon_fraction(spcd);
         assert_approx_eq!(c, 1626.474894645920, 1e-2);
     }
