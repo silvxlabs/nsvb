@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_double, c_uint};
 use std::slice;
-mod tree;
+pub mod tree;
 
 #[no_mangle]
 pub extern "C" fn gross_stem_vol_ib_ffi(

@@ -53,7 +53,7 @@ pub fn height_to_diameter(
 
     // Run solver
     let res = Executor::new(ht_to_dia, solver)
-        .configure(|state| state.max_iters(100).target_cost(0.0001))
+        .configure(|state| state.max_iters(1000).target_cost(0.0001))
         .run()
         .unwrap();
 

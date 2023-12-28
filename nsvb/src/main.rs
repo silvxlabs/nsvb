@@ -1,7 +1,7 @@
 use clap::Parser;
 use std::{error::Error, io, io::Write, path::Path};
 
-mod tree;
+pub mod tree;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
