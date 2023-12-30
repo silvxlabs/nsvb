@@ -140,7 +140,7 @@ pub fn foilage_biomass(spcd: u16, division: &str, dia: f64, ht: f64) -> f64 {
     }
 }
 
-pub fn wood_specief_gravity(spcd: u16) -> f64 {
+pub fn wood_specific_gravity(spcd: u16) -> f64 {
     if let Some(species) = species::SPECIES_MAP.get(spcd.to_string().as_str()) {
         species.wdsg
     } else {
@@ -154,6 +154,32 @@ pub fn carbon_fraction(spcd: u16) -> f64 {
     } else {
         0.5
     }
+}
+
+// TODO: The mean crown ratio table (S11) needs to be investigated further.
+// In GTR example 3, the authors specify Marine Division - Mountain (M240). They
+// say 240, but I'm pretty sure they mean M240. Then, in the equation for BranchRem,
+// they use a mean cr value of 0.378 from table S11 for division M242. There are no
+// values for division M240 (and I think M242 is a subdivision). If the example is
+// based on M240, how do we pull the right values from S11? For instance, why not
+// use the mean cr value for M241?
+pub fn mean_crown_ratio(spcd: u16, division: &str) -> f64 {
+    let default_ratio = species::MEAN_CROWN_RATIO_MAP.get("default").unwrap();
+    let ratio = match spcd {
+        1..=299 => {
+            &species::MEAN_CROWN_RATIO_MAP
+                .get(division)
+                .unwrap_or(default_ratio)
+                .softwood
+        }
+        _ => {
+            &species::MEAN_CROWN_RATIO_MAP
+                .get(division)
+                .unwrap_or(default_ratio)
+                .hardwood
+        }
+    };
+    *ratio
 }
 
 pub fn all_components(

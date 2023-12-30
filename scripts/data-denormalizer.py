@@ -2,7 +2,7 @@
 Notes:
 
 This script is designed to denormalize and preprocess coefficient data from various
-CSV files for use in a Rust-based CLI application. It reads multiple coefficient tables
+CSV files for use in a Rust library. It reads multiple coefficient tables
 from the NSVB GTR Supplement, processes them, and compiles a data structure that maps
 species codes to their respective coefficients for different biomass and volume components
 and eco division groupings. A heirachical fallback is embedded in the data structure such
@@ -23,6 +23,7 @@ not a concern.
 
 import json
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from typing import Tuple, List
 
@@ -94,8 +95,9 @@ live_carbon = pd.read_csv(data_path / live_carbon_file)
 # Pre-process live_carbon to map species codes to carbon fractions
 carbon_fraction_map = live_carbon.set_index("SPCD")["fia.wood.c"].to_dict()
 
-# TODO: We are currently not using the mean crown ratio data. More
-# investigation is needed to determine if and when this is needed.
+# TODO: We are currently seeking clarification on the mean crown ratio table from
+# the Forest Service. The table is organized by the eco subdivision code, but the
+# GTR examples only reference division codes.
 mean_crown_ratio = pd.read_csv(data_path / mean_crown_ratio_file)
 
 # Read in each coefficient file
@@ -215,7 +217,28 @@ for ref_index, ref_row in ref_species.iterrows():
     # Add species data to main data dictionary
     data[spcd] = species_data
 
+# Build dictionary for mean crown ratio by hardwood/softwood and division
+mean_cr = {}
+# Remove the Islan division
+mean_crown_ratio = mean_crown_ratio[mean_crown_ratio["Division"] != "Islan"]
+# Change undefined divisions to default
+mean_crown_ratio["Division"] = mean_crown_ratio["Division"].replace(
+    "UNDEFINED", "default"
+)
+# Get unique division codes
+divisions = mean_crown_ratio["Division"].unique()
+for division in divisions:
+    hard_soft = mean_crown_ratio[mean_crown_ratio["Division"] == division]
+    mean_cr[division] = {
+        "hardwood": hard_soft[hard_soft["HWD Y/N"] == "Y"].iloc[0]["Mean CR"] / 100.0,
+        "softwood": hard_soft[hard_soft["HWD Y/N"] == "N"].iloc[0]["Mean CR"] / 100.0,
+    }
+
+
 # Write to a Rust file
 with open("./coefs.rs", "w") as f:
     species_data = json.dumps(data, sort_keys=True, separators=(",", ":"))
-    f.write(f'pub const SPECIES_DATA: &str = r#"{species_data}"#;')
+    mean_cr_data = json.dumps(mean_cr, sort_keys=True, separators=(",", ":"))
+    f.write(
+        f'pub const SPECIES_DATA: &str = r#"{species_data}"#;\n\npub const MEAN_CROWN_RATIO_DATA: &str = r#"{mean_cr_data}"#;'
+    )

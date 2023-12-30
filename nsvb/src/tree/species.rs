@@ -1,9 +1,6 @@
 use lazy_static::lazy_static;
-use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::{Deserialize, Serialize};
-use serde_json::Result;
 use std::collections::HashMap;
-use std::fmt;
 
 mod coefs;
 
@@ -36,5 +33,20 @@ lazy_static! {
     pub static ref SPECIES_MAP: SpeciesMap = {
         let species_data = coefs::SPECIES_DATA;
         serde_json::from_str(species_data).unwrap()
+    };
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Division {
+    pub hardwood: f64,
+    pub softwood: f64,
+}
+
+type MeanCrownRatioMap = HashMap<String, Division>;
+
+lazy_static! {
+    pub static ref MEAN_CROWN_RATIO_MAP: MeanCrownRatioMap = {
+        let mean_crown_ratio_data = coefs::MEAN_CROWN_RATIO_DATA;
+        serde_json::from_str(mean_crown_ratio_data).unwrap()
     };
 }
