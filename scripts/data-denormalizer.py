@@ -44,39 +44,39 @@ mean_crown_ratio_file = "Table S11_mean_crprop.csv"
 # The key names here are important to maintain as they are used in the Rust CLI
 # to access coefficients for each component.
 coef_files = {
-    "volib": {
+    "StemWoodVolume": {
         "spcd": "Table S1a_volib_coefs_spcd.csv",
         "jenkins": "Table S1b_volib_coefs_jenkins.csv",
     },
-    "volbk": {
+    "StemBarkVolume": {
         "spcd": "Table S2a_volbk_coefs_spcd.csv",
         "jenkins": "Table S2b_volbk_coefs_jenkins.csv",
     },
-    "volob": {
+    "StemTotalVolume": {
         "spcd": "Table S3a_volob_coefs_spcd.csv",
         "jenkins": "Table S3b_volob_coefs_jenkins.csv",
     },
-    "rcumob": {
+    "StemTotalVolumeRatio": {
         "spcd": "Table S4a_rcumob_coefs_spcd.csv",
         "jenkins": "Table S4b_rcumob_coefs_jenkins.csv",
     },
-    "rcumib": {
+    "StemWoodVolumeRatio": {
         "spcd": "Table S5a_rcumib_coefs_spcd.csv",
         "jenkins": "Table S5b_rcumib_coefs_jenkins.csv",
     },
-    "bark_biomass": {
+    "BarkBiomass": {
         "spcd": "Table S6a_bark_biomass_coefs_spcd.csv",
         "jenkins": "Table S6b_bark_biomass_coefs_jenkins.csv",
     },
-    "branch_biomass": {
+    "BranchBiomass": {
         "spcd": "Table S7a_branch_biomass_coefs_spcd.csv",
         "jenkins": "Table S7b_branch_biomass_coefs_jenkins.csv",
     },
-    "total_biomass": {
+    "TotalBiomass": {
         "spcd": "Table S8a_total_biomass_coefs_spcd.csv",
         "jenkins": "Table S8b_total_biomass_coefs_jenkins.csv",
     },
-    "foliage_biomass": {
+    "FoliageBiomass": {
         "spcd": "Table S9a_foliage_coefs_spcd.csv",
         "jenkins": "Table S9b_foliage_coefs_jenkins.csv",
     },
@@ -176,14 +176,20 @@ for ref_index, ref_row in ref_species.iterrows():
         continue
 
     # Retrieve carbon fraction from the map, defaults to 0.5 if species is not found
-    carbon_fraction = carbon_fraction_map.get(spcd, 0.5)
+    carbon_fraction = carbon_fraction_map.get(spcd, 50.0)
 
     # Initialize species data
-    species_data = {"wdsg": wdsg, "bksg": bksg, "cfrac": carbon_fraction}
+    data[spcd] = {}
+    data[spcd]["properties"] = {
+        "WoodSpecificGravity": wdsg,
+        "BarkSpecificGravity": bksg,
+        "CarbonFraction": carbon_fraction / 100.0,
+    }
 
+    models = {}
     # Process component model coefficients and eco divisions
     for component, group in coef_dfs.items():
-        species_data[component] = {}
+        models[component] = {}
         spcd_df = group["spcd"][group["spcd"]["SPCD"] == spcd]
 
         # Use the species-specific, and possibly division-specific, coefficients
@@ -191,14 +197,14 @@ for ref_index, ref_row in ref_species.iterrows():
         if not spcd_df.empty:
             # Loop over possible division codes
             for index, row in spcd_df.iterrows():
-                model, coefs = parse_model_coefs(row, seg_point, wdsg)
+                form, coefs = parse_model_coefs(row, seg_point, wdsg)
                 if not pd.isnull(row["DIVISION"]):
                     division_code = row["DIVISION"]
                 else:
                     division_code = "default"
-                species_data[component][division_code] = {
+                models[component][division_code] = {
                     "group": "spcd",
-                    "model": model,
+                    "form": form,
                     "coefs": coefs,
                 }
 
@@ -207,15 +213,15 @@ for ref_index, ref_row in ref_species.iterrows():
             jenkins_row = group["jenkins"][
                 group["jenkins"]["JENKINS_SPGRPCD"] == jenkins_group
             ].iloc[0]
-            model, coefs = parse_model_coefs(jenkins_row, seg_point, wdsg)
-            species_data[component]["default"] = {
+            form, coefs = parse_model_coefs(jenkins_row, seg_point, wdsg)
+            models[component]["default"] = {
                 "group": "jenkins",
-                "model": model,
+                "form": form,
                 "coefs": coefs,
             }
 
     # Add species data to main data dictionary
-    data[spcd] = species_data
+    data[spcd]["models"] = models
 
 # Build dictionary for mean crown ratio by hardwood/softwood and division
 mean_cr = {}
@@ -236,7 +242,7 @@ for division in divisions:
 
 
 # Write to a Rust file
-with open("./coefs.rs", "w") as f:
+with open("./db.rs", "w") as f:
     species_data = json.dumps(data, sort_keys=True, separators=(",", ":"))
     mean_cr_data = json.dumps(mean_cr, sort_keys=True, separators=(",", ":"))
     f.write(
