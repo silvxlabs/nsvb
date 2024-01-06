@@ -241,10 +241,17 @@ for division in divisions:
     }
 
 
+# Remove db.rs if it exists
+db_path = Path("../src/models/species/db.rs")
+if db_path.exists():
+    db_path.unlink()
+
 # Write to a Rust file
-with open("./db.rs", "w") as f:
+with open(db_path, "w") as f:
     species_data = json.dumps(data, sort_keys=True, separators=(",", ":"))
-    mean_cr_data = json.dumps(mean_cr, sort_keys=True, separators=(",", ":"))
+    # TODO: We are currently seeking clarification on the mean crown ratio table from FS
+    # mean_cr_data = json.dumps(mean_cr, sort_keys=True, separators=(",", ":"))
     f.write(
-        f'pub const SPECIES_DATA: &str = r#"{species_data}"#;\n\npub const MEAN_CROWN_RATIO_DATA: &str = r#"{mean_cr_data}"#;'
+        f'pub const SPECIES_DATA: &str = r#"{species_data}"#;\n'
+        # f'pub const MEAN_CROWN_RATIO_DATA: &str = r#"{mean_cr_data}"#;'
     )
