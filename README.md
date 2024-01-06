@@ -1,7 +1,7 @@
 # <center> VBX </center>
 
 ## Introduction
-Welcome to the Tree Biomass and Volume Extension Library (VBX). VBX faithfully implements the National Scale Volume and Biomass (NSVB) models released by the Forest Service. It's tailored to offer a robust suite of functionalities, ranging from standard tree volume and biomass calculations to extended functionality such as diameter increment and volume estimates from stump measurements.
+Welcome to the Tree Volume and Biomass Extension Library (VBX). VBX faithfully implements the National Scale Volume and Biomass (NSVB) models released by the Forest Service. It's tailored to offer a robust suite of functionalities, ranging from standard tree volume and biomass calculations to extended functionality such as diameter increment and volume estimates from stump measurements.
 
 ## Features
 - __NSVB Models:__ Includes a full implementation of the National Scale Volume and Biomass models. Our test suite is built around the four example in the NSVB GTR document.
