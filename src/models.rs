@@ -16,15 +16,15 @@ use species::structs::Model;
 /// # Examples
 ///
 /// ```
-/// use nsvb;
+/// use vbx;
 ///
-/// let volume = nsvb::stem_wood_volume(202, 20.0, 110.0, Some("240")).unwrap();
+/// let volume = vbx::stem_wood_volume(202, 20.0, 110.0, Some("240")).unwrap();
 /// assert_eq!(volume, 88.45229093648126);
 /// ```
 ///
 /// # Notes
 ///
-/// This function queries coefficients from Table S1a and S1b from the NSVB GTR
+/// This function queries coefficients from Table S1a and S1b from the vbx GTR
 /// supplement.
 pub fn stem_wood_volume(
     spcd: u16,
@@ -49,15 +49,15 @@ pub fn stem_wood_volume(
 /// # Examples
 ///
 /// ```
-/// use nsvb;
+/// use vbx;
 ///
-/// let volume = nsvb::stem_bark_volume(202, 20.0, 110.0, Some("240")).unwrap();
+/// let volume = vbx::stem_bark_volume(202, 20.0, 110.0, Some("240")).unwrap();
 /// assert_eq!(volume, 13.197130062388565);
 /// ```
 ///
 /// # Notes
 ///
-/// This function queries coefficients from Table S2a and S2b from the NSVB GTR
+/// This function queries coefficients from Table S2a and S2b from the vbx GTR
 /// supplement.
 pub fn stem_bark_volume(
     spcd: u16,
@@ -83,16 +83,16 @@ pub fn stem_bark_volume(
 /// # Examples
 ///
 /// ```
-/// use nsvb;
+/// use vbx;
 ///
-/// let height = nsvb::height_to_diameter(202, 20.0, 110.0, 9.0, None).unwrap();
+/// let height = vbx::height_to_diameter(202, 20.0, 110.0, 9.0, None).unwrap();
 /// assert_eq!(height, 78.32313537597656);
 /// ```
 ///
 /// # Notes
 ///
 /// This function queries coefficients from Tabls S3a, S3b, S4a, and S4b from
-/// the NSVB GTR supplement.
+/// the vbx GTR supplement.
 pub fn height_to_diameter(
     spcd: u16,
     dia: f64,
@@ -124,15 +124,15 @@ pub fn height_to_diameter(
 /// # Examples
 ///
 /// ```
-/// use nsvb;
+/// use vbx;
 ///
-/// let ratio = nsvb::stem_volume_ratio(202, 78.32313537597656/110.0, Some("240")).unwrap();
+/// let ratio = vbx::stem_volume_ratio(202, 78.32313537597656/110.0, Some("240")).unwrap();
 /// assert_eq!(ratio, 0.9533893700705219);
 /// ```
 ///
 /// # Notes
 ///
-/// This function queries coefficients from Tabls S5a and S5b from the NSVB GTR
+/// This function queries coefficients from Tabls S5a and S5b from the vbx GTR
 /// supplement.
 pub fn stem_volume_ratio(spcd: u16, ht_ratio: f64, division: Option<&str>) -> Result<f64, String> {
     let div = division.unwrap_or("default");
@@ -153,15 +153,15 @@ pub fn stem_volume_ratio(spcd: u16, ht_ratio: f64, division: Option<&str>) -> Re
 /// # Examples
 ///
 /// ```
-/// use nsvb;
+/// use vbx;
 ///
-/// let biomass = nsvb::total_biomass(202, 20.0, 110.0, Some("240")).unwrap();
+/// let biomass = vbx::total_biomass(202, 20.0, 110.0, Some("240")).unwrap();
 /// assert_eq!(biomass, 3154.553996629238);
 /// ```
 ///
 /// # Notes
 ///
-/// This function queries coefficients from Table S8a and S8b from the NSVB GTR
+/// This function queries coefficients from Table S8a and S8b from the vbx GTR
 /// supplement.
 pub fn total_biomass(spcd: u16, dia: f64, ht: f64, division: Option<&str>) -> Result<f64, String> {
     let div = division.unwrap_or("default");
@@ -181,15 +181,15 @@ pub fn total_biomass(spcd: u16, dia: f64, ht: f64, division: Option<&str>) -> Re
 /// # Examples
 ///
 /// ```
-/// use nsvb;
+/// use vbx;
 ///
-/// let biomass = nsvb::bark_biomass(202, 20.0, 110.0, Some("240")).unwrap();
+/// let biomass = vbx::bark_biomass(202, 20.0, 110.0, Some("240")).unwrap();
 /// assert_eq!(biomass, 361.7824889136451);
 /// ```
 ///
 /// # Notes
 ///
-/// This function queries coefficients from Table S6a and S6b from the NSVB GTR
+/// This function queries coefficients from Table S6a and S6b from the vbx GTR
 /// supplement.
 pub fn bark_biomass(spcd: u16, dia: f64, ht: f64, division: Option<&str>) -> Result<f64, String> {
     let div = division.unwrap_or("default");
@@ -209,15 +209,15 @@ pub fn bark_biomass(spcd: u16, dia: f64, ht: f64, division: Option<&str>) -> Res
 /// # Examples
 ///
 /// ```
-/// use nsvb;
+/// use vbx;
 ///
-/// let biomass = nsvb::branch_biomass(202, 20.0, 110.0, Some("240")).unwrap();
+/// let biomass = vbx::branch_biomass(202, 20.0, 110.0, Some("240")).unwrap();
 /// assert_eq!(biomass, 277.4877562341372);
 /// ```
 ///
 /// # Notes
 ///
-/// This function queries coefficients from Table S7a and S7b from the NSVB GTR
+/// This function queries coefficients from Table S7a and S7b from the vbx GTR
 /// supplement.
 pub fn branch_biomass(spcd: u16, dia: f64, ht: f64, division: Option<&str>) -> Result<f64, String> {
     let div = division.unwrap_or("default");
@@ -237,15 +237,15 @@ pub fn branch_biomass(spcd: u16, dia: f64, ht: f64, division: Option<&str>) -> R
 /// # Examples
 ///
 /// ```
-/// use nsvb;
+/// use vbx;
 ///
-/// let biomass = nsvb::foliage_biomass(202, 20.0, 110.0, Some("240")).unwrap();
+/// let biomass = vbx::foliage_biomass(202, 20.0, 110.0, Some("240")).unwrap();
 /// assert_eq!(biomass, 83.63478892024017);
 /// ```
 ///
 /// # Notes
 ///
-/// This function queries coefficients from Table S9a and S9b from the NSVB GTR
+/// This function queries coefficients from Table S9a and S9b from the vbx GTR
 /// supplement.
 pub fn foliage_biomass(
     spcd: u16,
