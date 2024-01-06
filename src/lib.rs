@@ -1,9 +1,14 @@
 pub mod ffi;
 mod models;
+mod tree;
 
-// Re-export the models to bring them into the root crate namespace. The functions
-// live in the models module so they can be reused by the FFI functions in ffi.rs.
-// However, we want to expose them at the root level for user's convenience.
+// Re-export the tree module to bring it into the crate namespace.
+pub use tree::Tree;
+
+// Re-export the models to bring them into the crate namespace. The functions
+// live in the models module so they can be reused by the FFI functions in ffi.rs
+// and Tree struct in tree.rs. However, we want to expose them at the root level
+// for user's convenience when building interfaces with other languages.
 pub use models::bark_biomass;
 pub use models::branch_biomass;
 pub use models::foliage_biomass;
