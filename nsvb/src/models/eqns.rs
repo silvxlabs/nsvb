@@ -44,8 +44,8 @@ pub fn weight_volume(dia: f64, ht: f64, form: u8, coefs: &Vec<f64>) -> f64 {
 }
 
 // Volume ratio model (Model 6)
-pub fn volume_ratio(z: f64, ht: f64, alpha: f64, beta: f64) -> f64 {
-    return (1.0 - (1.0 - z / ht).powf(alpha)).powf(beta);
+pub fn volume_ratio(ht_ratio: f64, alpha: f64, beta: f64) -> f64 {
+    return (1.0 - (1.0 - ht_ratio).powf(alpha)).powf(beta);
 }
 
 #[derive(Default)]
