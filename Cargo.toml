@@ -14,7 +14,6 @@ crate-type = ["rlib", "cdylib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-argmin = "0.8.1"
 assert_approx_eq = "1.1.0"
 lazy_static = "1.4.0"
 serde = { version = "1.0.193", features = ["derive"] }

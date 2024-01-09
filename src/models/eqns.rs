@@ -1,7 +1,3 @@
-use argmin::core::Executor;
-use argmin::core::{CostFunction, Error};
-use argmin::solver::neldermead::NelderMead;
-
 // Model 1
 fn schumacher_hall(dia: f64, ht: f64, a: f64, b: f64, c: f64) -> f64 {
     return a * dia.powf(b) * ht.powf(c);
@@ -58,60 +54,76 @@ pub fn height_lri(dia: f64, lri: f64, coefs: &Vec<f64>) -> f64 {
     return a * dia.powf(b);
 }
 
-#[derive(Default)]
-struct HeightToDiameter {
+pub fn diameter_at_height(
     dia: f64,
     ht: f64,
-    d_i: f64,
-    a: f64,
-    b: f64,
-    c: f64,
-    alpha: f64,
-    beta: f64,
-}
-
-impl CostFunction for HeightToDiameter {
-    type Param = f64;
-    type Output = f64;
-
-    fn cost(&self, h_i: &Self::Param) -> Result<Self::Output, Error> {
-        let term1 = (self.a * self.dia.powf(self.b) * self.ht.powf(self.c) / 0.005454154) / self.ht
-            * self.alpha
-            * self.beta;
-        let term2 = (1.0 - h_i / self.ht).abs().powf(self.alpha - 1.0);
-        let term3 = (1.0 - (1.0 - h_i / self.ht).abs().powf(self.alpha)).powf(self.beta - 1.0);
-        Ok((self.d_i - (term1 * term2 * term3).powf(0.5)).abs())
-    }
-}
-
-pub fn height_to_diameter(
-    dia: f64,
-    ht: f64,
-    d_i: f64,
+    hi: f64,
     volob_coefs: &Vec<f64>,
     ratio_coefs: &Vec<f64>,
 ) -> f64 {
-    let ht_to_dia = HeightToDiameter {
-        dia: dia,
-        ht: ht,
-        d_i: d_i,
-        a: volob_coefs[0],
-        b: volob_coefs[1],
-        c: volob_coefs[2],
-        alpha: ratio_coefs[0],
-        beta: ratio_coefs[1],
-    };
-    // Initial parameter vector (initial guess)
-    let init_param: Vec<f64> = [0.0, ht_to_dia.ht].to_vec();
+    let term1 = (volob_coefs[0] * dia.powf(volob_coefs[1]) * ht.powf(volob_coefs[2]) / 0.005454154)
+        / ht
+        * ratio_coefs[0]
+        * ratio_coefs[1];
+    let term2 = (1.0 - hi / ht).abs().powf(ratio_coefs[0] - 1.0);
+    let term3 = (1.0 - (1.0 - hi / ht).abs().powf(ratio_coefs[0])).powf(ratio_coefs[1] - 1.0);
+    (term1 * term2 * term3).powf(0.5)
+}
 
-    // Set up solver
-    let solver = NelderMead::new(init_param);
+pub fn height_at_diameter(
+    dia: f64,
+    ht: f64,
+    di: f64,
+    volob_coefs: &Vec<f64>,
+    ratio_coefs: &Vec<f64>,
+) -> f64 {
+    // Initialize upper and lower bounds
+    let mut low = 0.0;
+    let mut high = ht;
+    let mut hi = (low + high) / 2.0;
 
-    // Run solver
-    let res = Executor::new(ht_to_dia, solver)
-        .configure(|state| state.max_iters(1000).target_cost(0.0001))
-        .run()
-        .unwrap();
+    // Iterate until the difference between the top diameter and the desired
+    // diameter is less than 0.001
+    while high - low > 0.001 {
+        hi = (low + high) / 2.0;
+        let top_dia = diameter_at_height(dia, ht, hi, volob_coefs, ratio_coefs);
 
-    return res.state.best_param.unwrap();
+        if (top_dia - di).abs() < 0.001 {
+            return hi;
+        } else if top_dia > di {
+            low = hi;
+        } else {
+            high = hi;
+        }
+    }
+
+    hi
+}
+
+pub fn dbh_from_stump_dia(
+    stump_dia: f64,
+    stump_height: f64,
+    volob_coefs: &Vec<f64>,
+    ratio_coefs: &Vec<f64>,
+    height_coefs: &Vec<f64>,
+) -> f64 {
+    let mut low = 0.0;
+    let mut high = stump_dia;
+    let mut dbh = (low + high) / 2.0;
+
+    while high - low > 0.001 {
+        dbh = (low + high) / 2.0;
+        let ht = height(dbh, height_coefs);
+        let dia = diameter_at_height(dbh, ht, stump_height, volob_coefs, ratio_coefs);
+
+        if (dia - stump_dia).abs() < 0.001 {
+            return dbh;
+        } else if dia > stump_dia {
+            high = dbh;
+        } else {
+            low = dbh;
+        }
+    }
+
+    dbh
 }
