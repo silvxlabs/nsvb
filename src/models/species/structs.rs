@@ -19,6 +19,7 @@ pub enum Model {
     BarkBiomass,
     BranchBiomass,
     FoliageBiomass,
+    HeightDiameter,
 }
 
 #[derive(Hash, Eq, PartialEq, Deserialize, Serialize, Debug)]

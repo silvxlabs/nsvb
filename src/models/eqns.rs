@@ -48,6 +48,16 @@ pub fn volume_ratio(ht_ratio: f64, alpha: f64, beta: f64) -> f64 {
     return (1.0 - (1.0 - ht_ratio).powf(alpha)).powf(beta);
 }
 
+pub fn height(dia: f64, coefs: &Vec<f64>) -> f64 {
+    return coefs[6] * dia.powf(coefs[7]);
+}
+
+pub fn height_lri(dia: f64, lri: f64, coefs: &Vec<f64>) -> f64 {
+    let a = coefs[0] * lri + coefs[4] * (1.0 - lri);
+    let b = coefs[1] * lri + coefs[5] * (1.0 - lri);
+    return a * dia.powf(b);
+}
+
 #[derive(Default)]
 struct HeightToDiameter {
     dia: f64,

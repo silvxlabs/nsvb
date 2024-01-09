@@ -11,7 +11,10 @@ pub use tree::Tree;
 // for user's convenience when building interfaces with other languages.
 pub use models::bark_biomass;
 pub use models::branch_biomass;
+pub use models::find_lri;
 pub use models::foliage_biomass;
+pub use models::height;
+pub use models::height_lri;
 pub use models::height_to_diameter;
 pub use models::stem_bark_volume;
 pub use models::stem_volume_ratio;

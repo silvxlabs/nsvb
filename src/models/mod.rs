@@ -257,3 +257,83 @@ pub fn foliage_biomass(
     let model = species::get_model(spcd, Model::FoliageBiomass, div)?;
     Ok(eqns::weight_volume(dia, ht, model.form, &model.coefs))
 }
+
+/// Calculate the height in feet given a diameter at breast height in inches.
+///
+/// # Arguments
+///
+/// * `spcd` - FIA species code
+/// * `dia` - Diameter at breast height (in)
+///
+/// # Examples
+///
+/// ```
+/// use vbx;
+///
+/// let height = vbx::height(202, 20.0).unwrap();
+/// assert_eq!(height, 94.4010122345696);
+/// ```
+pub fn height(spcd: u16, dia: f64) -> Result<f64, String> {
+    let model = species::get_model(spcd, Model::HeightDiameter, "default")?;
+    Ok(eqns::height(dia, &model.coefs))
+}
+
+/// Calculate the height in feet given a diameter at breast height in inches and
+/// a light resource index.
+///
+/// # Arguments
+///
+/// * `spcd` - FIA species code
+/// * `dia` - Diameter at breast height (in)
+/// * `lri` - Light resource index
+///
+/// # Examples
+///
+/// ```
+/// use vbx;
+///
+/// let height = vbx::height_lri(202, 20.0, 0.375).unwrap();
+/// assert_eq!(height, 110.1549613551761);
+/// ```
+pub fn height_lri(spcd: u16, dia: f64, lri: f64) -> Result<f64, String> {
+    let model = species::get_model(spcd, Model::HeightDiameter, "default")?;
+    Ok(eqns::height_lri(dia, lri, &model.coefs))
+}
+
+/// Calculate the light resource index given a diameter at breast height in
+/// inches and a target height in feet.
+///
+/// # Arguments
+///
+/// * `spcd` - FIA species code
+/// * `dia` - Diameter at breast height (in)
+/// * `target_ht` - Target height (ft)
+///
+/// # Examples
+///
+/// ```
+/// use vbx;
+///
+/// let lri = vbx::find_lri(202, 20.0, 180.0);
+/// assert_eq!(lri, 0.375);
+/// ```
+pub fn find_lri(spcd: u16, dia: f64, target_ht: f64) -> f64 {
+    let mut low = 0.0;
+    let mut high = 1.0;
+    let mut lri = (low + high) / 2.0;
+
+    while high - low > 0.01 {
+        lri = (low + high) / 2.0;
+        let ht = height_lri(spcd, dia, lri).unwrap();
+
+        if (ht - target_ht).abs() < 0.01 {
+            return lri;
+        } else if ht > target_ht {
+            high = lri;
+        } else {
+            low = lri;
+        }
+    }
+
+    lri
+}

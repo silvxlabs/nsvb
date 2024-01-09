@@ -80,6 +80,10 @@ coef_files = {
         "spcd": "Table S9a_foliage_coefs_spcd.csv",
         "jenkins": "Table S9b_foliage_coefs_jenkins.csv",
     },
+    "HeightDiameter": {
+        "spcd": "hd_spcd.csv",
+        "jenkins": "hd_jenkins.csv",
+    },
 }
 
 
@@ -144,6 +148,7 @@ def parse_model_coefs(row: pd.Series, k: float, wdsg: float) -> Tuple[int, List[
         4: ["a", "b", "b1", "c"],
         5: ["a", "b", "c"],
         6: ["alpha", "beta"],
+        11: ["p05_a", "p05_b", "p50_a", "p50_b", "p95_a", "p95_b", "ols_a", "ols_b"],
     }
 
     if model not in coefficient_map:
