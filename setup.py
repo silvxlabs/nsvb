@@ -52,4 +52,5 @@ setup(
     package_data={"nsvb": ["data/*"]},
     include_package_data=True,
     python_requires=">=3.9",
+    install_requires=[],
 )
