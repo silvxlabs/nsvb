@@ -55,7 +55,7 @@ jobs:
           pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple nsvb
       - name: Install test dependencies
         run: |
-          pip install -r pytest
+          pip install pytest
       - name: Run pytest
         env:
           TEST_ENV: test_pypi
@@ -104,7 +104,7 @@ jobs:
           pip install nsvb
       - name: Install test dependencies
         run: |
-          pip install -r pytest
+          pip install pytest
       - name: Run pytest
         env:
           TEST_ENV: pypi
