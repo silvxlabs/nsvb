@@ -1,8 +1,12 @@
 name: Release Workflow
 
+#on:
+#  release:
+#    types: [ published ]
 on:
-  release:
-    types: [ published ]
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
