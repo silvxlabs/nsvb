@@ -4,7 +4,7 @@ from nsvb.tables import REF_SPECIES, TABLES
 WEIGHT_CUBIC_FOOT_WATER = 62.4  # lb/ft^3
 
 
-def run_model_form(
+def _run_model_form(
     table_name: str, spcd: int, dia: float, ht: float, division: str = ""
 ) -> float:
     """
@@ -55,7 +55,7 @@ def total_inside_bark_wood_volume(
     Returns:
         float: Total inside bark wood volume.
     """
-    return run_model_form("s1", spcd, dia, ht, division)
+    return _run_model_form("s1", spcd, dia, ht, division)
 
 
 def total_bark_wood_volume(
@@ -76,7 +76,7 @@ def total_bark_wood_volume(
     Returns:
         float: Total outside bark wood volume.
     """
-    return run_model_form("s2", spcd, dia, ht, division)
+    return _run_model_form("s2", spcd, dia, ht, division)
 
 
 def total_outside_bark_volume(
@@ -169,7 +169,7 @@ def total_stem_bark_weight(
     Returns:
         float: Total stem bark weight in pounds (lb).
     """
-    return run_model_form("s6", spcd, dia, ht, division)
+    return _run_model_form("s6", spcd, dia, ht, division)
 
 
 def total_branch_weight(spcd: int, dia: float, ht: float, division: str = "") -> float:
@@ -192,7 +192,7 @@ def total_branch_weight(spcd: int, dia: float, ht: float, division: str = "") ->
     Returns:
         float: Total branch weight in pounds (lb).
     """
-    return run_model_form("s7", spcd, dia, ht, division)
+    return _run_model_form("s7", spcd, dia, ht, division)
 
 
 def total_aboveground_biomass(
@@ -219,7 +219,7 @@ def total_aboveground_biomass(
     Returns:
         float: Total aboveground biomass in pounds (lb).
     """
-    return run_model_form("s8", spcd, dia, ht, division)
+    return _run_model_form("s8", spcd, dia, ht, division)
 
 
 def total_foliage_dry_weight(
@@ -233,4 +233,4 @@ def total_foliage_dry_weight(
     Corresponds to step 15 of "Examples of Tree-Level Calculations" in the GTR.
 
     """
-    return run_model_form("s9", spcd, dia, ht, division)
+    return _run_model_form("s9", spcd, dia, ht, division)
