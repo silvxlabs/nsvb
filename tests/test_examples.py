@@ -1,4 +1,4 @@
-from nsvb.equations import (
+from nsvb.estimators import (
     total_inside_bark_wood_volume,
     total_bark_wood_volume,
     total_stem_wood_dry_weight,
