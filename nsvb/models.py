@@ -1,7 +1,12 @@
-from math import exp
+from typing import Union
+
+import numpy as np
+from numpy.typing import ArrayLike, NDArray
 
 
-def schumacher_hall_method(dia: float, ht: float, **kwargs) -> float:
+def schumacher_hall_method(
+    dia: Union[float, ArrayLike], ht: Union[float, ArrayLike], **kwargs
+) -> Union[float, NDArray]:
     """
     Schumacher-Hall Method.
 
@@ -22,7 +27,9 @@ def schumacher_hall_method(dia: float, ht: float, **kwargs) -> float:
     return a * (dia**b) * (ht**c) + e
 
 
-def segmented_model(dia: float, ht: float, **kwargs) -> float:
+def segmented_model(
+    dia: Union[float, ArrayLike], ht: Union[float, ArrayLike], **kwargs
+) -> Union[float, NDArray]:
     """
     Segmented Model.
 
@@ -44,12 +51,16 @@ def segmented_model(dia: float, ht: float, **kwargs) -> float:
     c = kwargs.get("c")
     k = kwargs.get("k")
     e = kwargs.get("e", 0)
-    if dia < k:
-        return a * (dia**b) * (ht**c) + e
-    return a * (k ** (b - b1)) * (dia**b1) * (ht**c) + e
+    return np.where(
+        dia < k,
+        a * (dia**b) * (ht**c) + e,
+        a * (k ** (b - b1)) * (dia**b1) * (ht**c) + e
+    )
 
 
-def continuously_variable_model(dia: float, ht: float, **kwargs) -> float:
+def continuously_variable_model(
+    dia: Union[float, ArrayLike], ht: Union[float, ArrayLike], **kwargs
+) -> Union[float, NDArray]:
     """
     Continuously Variable Model.
 
@@ -71,10 +82,12 @@ def continuously_variable_model(dia: float, ht: float, **kwargs) -> float:
     c = kwargs.get("c")
     c1 = kwargs.get("c1")
     e = kwargs.get("e", 0)
-    return a * (a1 * ((1 - exp(-b * dia)) ** c1)) * (ht**c) + e
+    return a * (a1 * ((1 - np.exp(-b * dia)) ** c1)) * (ht**c) + e
 
 
-def modifed_wiley_model(dia: float, ht: float, **kwargs) -> float:
+def modifed_wiley_model(
+    dia: Union[float, ArrayLike], ht: Union[float, ArrayLike], **kwargs
+) -> Union[float, NDArray]:
     """
     Modified Wiley Model.
 
@@ -94,10 +107,12 @@ def modifed_wiley_model(dia: float, ht: float, **kwargs) -> float:
     b1 = kwargs.get("b1")
     c = kwargs.get("c")
     e = kwargs.get("e", 0)
-    return a * (dia**b) * (ht**c) * exp(-(b1 * dia)) + e
+    return a * (dia**b) * (ht**c) * np.exp(-(b1 * dia)) + e
 
 
-def modified_schumaker_hall(dia: float, ht: float, **kwargs) -> float:
+def modified_schumaker_hall(
+    dia: Union[float, ArrayLike], ht: Union[float, ArrayLike], **kwargs
+) -> Union[float, NDArray]:
     """
     Modified Schumacher-Hall Method.
 
