@@ -1,3 +1,5 @@
+import numpy as np
+
 from nsvb.estimators import (
     total_inside_bark_wood_volume,
     total_bark_wood_volume,
@@ -684,3 +686,125 @@ class TestExample4:
             total_foliage_dry_weight(self.spcd, self.dia, self.ht, self.division)
             == 47.82328163632339
         )
+
+
+class TestVectorized:
+    """
+    Test vectorization by combining all 4 examples into arrays.
+
+    Uses the same trees from TestExample1-4:
+    - Example 1: Douglas-fir (spcd=202, dia=20.0, ht=110, division="240")
+    - Example 2: Red maple (spcd=316, dia=11.1, ht=38, division="M210", cull=3)
+    - Example 3: Tanoak (spcd=631, dia=11.3, ht=28, division="M240")
+    - Example 4: White oak (spcd=802, dia=18.1, ht=65, division="M220", cull=2)
+    """
+
+    # Arrays of all 4 examples
+    spcd = np.array([202, 316, 631, 802])
+    dia = np.array([20.0, 11.1, 11.3, 18.1])
+    ht = np.array([110, 38, 28, 65])
+    division = np.array(["240", "M210", "M240", "M220"])
+    cull = np.array([0, 3, 0, 2])  # Examples 1 and 3 have no cull
+
+    def test_inside_bark_wood_volume(self):
+        """Vectorized inside bark volume matches individual examples."""
+        result = total_inside_bark_wood_volume(self.spcd, self.dia, self.ht, self.division)
+
+        # Should return array
+        assert isinstance(result, np.ndarray)
+        assert len(result) == 4
+
+        # Should match each example's expected value
+        assert result[0] == 88.45229093648126  # Example 1
+        assert result[1] == 9.42711333158677   # Example 2
+        assert result[2] == 7.283116395242574  # Example 3
+        assert result[3] == 42.27783673140729  # Example 4
+
+    def test_total_bark_wood_volume(self):
+        """Vectorized bark volume matches individual examples."""
+        result = total_bark_wood_volume(self.spcd, self.dia, self.ht, self.division)
+
+        assert isinstance(result, np.ndarray)
+        assert len(result) == 4
+
+        assert result[0] == 13.197130062388565    # Example 1
+        assert result[1] == 2.1551061436670853    # Example 2
+        assert result[2] == 1.9071364767677488    # Example 3
+        assert result[3] == 8.361568897350095     # Example 4
+
+    def test_total_stem_wood_dry_weight(self):
+        """Vectorized stem wood weight matches individual examples."""
+        # Test without cull first
+        result_no_cull = total_stem_wood_dry_weight(
+            self.spcd, self.dia, self.ht, self.division
+        )
+
+        assert isinstance(result_no_cull, np.ndarray)
+        assert len(result_no_cull) == 4
+
+        assert result_no_cull[0] == 2483.7403294963938  # Example 1
+        assert result_no_cull[1] == 288.2434172265971   # Example 2 (no cull)
+        assert result_no_cull[2] == 263.59054857661926  # Example 3
+        assert result_no_cull[3] == 1582.8822072238888  # Example 4 (no cull)
+
+        # Test with cull
+        result_with_cull = total_stem_wood_dry_weight(
+            self.spcd, self.dia, self.ht, self.division, self.cull
+        )
+
+        assert isinstance(result_with_cull, np.ndarray)
+        assert len(result_with_cull) == 4
+
+        assert result_with_cull[0] == 2483.7403294963938  # Example 1 (cull=0)
+        assert result_with_cull[1] == 284.26565806887004  # Example 2 (cull=3)
+        assert result_with_cull[2] == 263.59054857661926  # Example 3 (cull=0)
+        # Example 4 with cull=2 commented out in original tests
+        # assert result_with_cull[3] == 1564.617593936140
+
+    def test_total_stem_bark_weight(self):
+        """Vectorized stem bark weight matches individual examples."""
+        result = total_stem_bark_weight(self.spcd, self.dia, self.ht, self.division)
+
+        assert isinstance(result, np.ndarray)
+        assert len(result) == 4
+
+        assert result[0] == 361.7824889136451   # Example 1
+        assert result[1] == 52.94546582033252   # Example 2
+        assert result[2] == 46.81666440280295   # Example 3
+        assert result[3] == 237.1544176737046   # Example 4
+
+    def test_total_branch_weight(self):
+        """Vectorized branch weight matches individual examples."""
+        result = total_branch_weight(self.spcd, self.dia, self.ht, self.division)
+
+        assert isinstance(result, np.ndarray)
+        assert len(result) == 4
+
+        assert result[0] == 277.4877562341372    # Example 1
+        assert result[1] == 135.00192318003036   # Example 2
+        assert result[2] == 226.78800239146196   # Example 3
+        assert result[3] == 770.2515898127575    # Example 4
+
+    def test_total_aboveground_biomass(self):
+        """Vectorized total aboveground biomass matches individual examples."""
+        result = total_aboveground_biomass(self.spcd, self.dia, self.ht, self.division)
+
+        assert isinstance(result, np.ndarray)
+        assert len(result) == 4
+
+        assert result[0] == 3154.553996629238   # Example 1
+        assert result[1] == 532.5847996695031   # Example 2
+        assert result[2] == 492.6214580952344   # Example 3
+        # Example 4 doesn't have test for total_aboveground_biomass
+
+    def test_total_foliage_dry_weight(self):
+        """Vectorized foliage weight matches individual examples."""
+        result = total_foliage_dry_weight(self.spcd, self.dia, self.ht, self.division)
+
+        assert isinstance(result, np.ndarray)
+        assert len(result) == 4
+
+        assert result[0] == 83.63478892024017   # Example 1
+        assert result[1] == 22.807960628763336  # Example 2
+        # Example 3 is dead tree, foliage = 0 (not tested in original)
+        assert result[3] == 47.82328163632339   # Example 4

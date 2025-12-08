@@ -1,3 +1,8 @@
+from typing import Union
+
+import numpy as np
+from numpy.typing import ArrayLike, NDArray
+
 from nsvb.models import MODEL_MAP
 from nsvb.tables import REF_SPECIES, TABLES
 
@@ -5,10 +10,15 @@ WEIGHT_CUBIC_FOOT_WATER = 62.4  # lb/ft^3
 
 
 def _run_model_form(
-    table_name: str, spcd: int, dia: float, ht: float, division: str = ""
-) -> float:
+    table_name: str,
+    spcd: Union[int, ArrayLike],
+    dia: Union[float, ArrayLike],
+    ht: Union[float, ArrayLike],
+    division: Union[str, ArrayLike] = "",
+) -> Union[float, NDArray]:
     """
     Run the model form for the given table.
+    Works with scalar or array inputs.
 
     Parameters:
         table_name (str): Table name.
@@ -20,24 +30,41 @@ def _run_model_form(
     Returns:
         float: Model form result.
     """
-    try:
-        table_name_spcd = f"{table_name}a"
-        table_data = TABLES[table_name_spcd]
-        data = table_data.get((spcd, division), table_data[(spcd, "")])
-    except KeyError:
-        spgrp = int(REF_SPECIES[spcd]["JENKINS_SPGRPCD"])
-        table_name_spgrp = f"{table_name}b"
-        table_data = TABLES[table_name_spgrp]
-        data = table_data.get(spgrp)
-        wdsg = float(REF_SPECIES[spcd]["WOOD_SPGR_GREENVOL_DRYWT"])
-        data["wdsg"] = wdsg
-    model_function = MODEL_MAP[data["model"]]
-    return model_function(dia, ht, **data)
+    # Scalar implementation (unchanged)
+    def _scalar_lookup(spcd_val, dia_val, ht_val, div_val):
+        try:
+            table_name_spcd = f"{table_name}a"
+            table_data = TABLES[table_name_spcd]
+            data = table_data.get((spcd_val, div_val), table_data[(spcd_val, "")])
+        except KeyError:
+            spgrp = int(REF_SPECIES[spcd_val]["JENKINS_SPGRPCD"])
+            table_name_spgrp = f"{table_name}b"
+            table_data = TABLES[table_name_spgrp]
+            data = table_data.get(spgrp)
+            wdsg = float(REF_SPECIES[spcd_val]["WOOD_SPGR_GREENVOL_DRYWT"])
+            data = data.copy()
+            data["wdsg"] = wdsg
+        model_function = MODEL_MAP[data["model"]]
+        return model_function(dia_val, ht_val, **data)
+
+    # Check if inputs are arrays
+    is_array = isinstance(spcd, np.ndarray) or isinstance(dia, np.ndarray) or isinstance(ht, np.ndarray)
+
+    if is_array:
+        # Vectorize the scalar function
+        vectorized_fn = np.vectorize(_scalar_lookup)
+        return vectorized_fn(spcd, dia, ht, division)
+    else:
+        # Use scalar path directly
+        return _scalar_lookup(int(spcd), float(dia), float(ht), str(division))
 
 
 def total_inside_bark_wood_volume(
-    spcd: int, dia: float, ht: float, division: str = ""
-) -> float:
+    spcd: Union[int, ArrayLike],
+    dia: Union[float, ArrayLike],
+    ht: Union[float, ArrayLike],
+    division: Union[str, ArrayLike] = "",
+) -> Union[float, NDArray]:
     """
     Predict gross total stem wood volume as a
     function of diameter at breast height (D) and
@@ -59,8 +86,11 @@ def total_inside_bark_wood_volume(
 
 
 def total_bark_wood_volume(
-    spcd: int, dia: float, ht: float, division: str = ""
-) -> float:
+    spcd: Union[int, ArrayLike],
+    dia: Union[float, ArrayLike],
+    ht: Union[float, ArrayLike],
+    division: Union[str, ArrayLike] = "",
+) -> Union[float, NDArray]:
     """
     Predict gross total stem bark volume as a function of D and H. Uses the
     appropriate model form and coefficients from table S2.
@@ -80,8 +110,11 @@ def total_bark_wood_volume(
 
 
 def total_outside_bark_volume(
-    spcd: int, dia: float, ht: float, division: str = ""
-) -> float:
+    spcd: Union[int, ArrayLike],
+    dia: Union[float, ArrayLike],
+    ht: Union[float, ArrayLike],
+    division: Union[str, ArrayLike] = "",
+) -> Union[float, NDArray]:
     """
     Obtain gross total stem outside-bark volume as
     the sum of wood and bark gross volumes.
@@ -103,8 +136,12 @@ def total_outside_bark_volume(
 
 
 def total_stem_wood_dry_weight(
-    spcd: int, dia: float, ht: float, division: str = "", cull: float = 0
-) -> float:
+    spcd: Union[int, ArrayLike],
+    dia: Union[float, ArrayLike],
+    ht: Union[float, ArrayLike],
+    division: Union[str, ArrayLike] = "",
+    cull: Union[float, ArrayLike] = 0,
+) -> Union[float, NDArray]:
     """
     Convert total stem wood gross volume to
     biomass weight using published wood density
@@ -112,6 +149,8 @@ def total_stem_wood_dry_weight(
     wood weight due to broken top, cull deductions
     (accounting for nonzero weight of cull), and dead
     tree wood density reduction.
+
+    Works with scalar or array inputs.
 
     Corresponds to step 7 of "Examples of Tree-Level Calculations" in the GTR.
 
@@ -125,31 +164,54 @@ def total_stem_wood_dry_weight(
     Returns:
         float: Total stem wood dry weight in pounds (lb).
     """
-    wdsg = float(REF_SPECIES[spcd]["WOOD_SPGR_GREENVOL_DRYWT"])
-    v_tot_ib = total_inside_bark_wood_volume(spcd, dia, ht, division)
+    # Check if array input
+    is_array = isinstance(spcd, np.ndarray) or isinstance(dia, np.ndarray)
 
-    if cull > 0:
-        # It is considered that most cull will be rotten wood, which would
-        # still contribute to the stem weight. As such, it is assumed the
-        # density of cull wood is reduced by the proportion for DECAYCD = 3
-        # (see table 1; wood density proportion (DensProp) is 0.54 for
-        # hardwood species and 0.92 for softwood species)
-        dens_prop = 0.54 if REF_SPECIES[spcd]["SFTWD_HRDWD"] == "H" else 0.92
+    # Scalar path
+    if not is_array:
+        wdsg = float(REF_SPECIES[spcd]["WOOD_SPGR_GREENVOL_DRYWT"])
+        v_tot_ib = total_inside_bark_wood_volume(spcd, dia, ht, division)
 
-        return (
-            v_tot_ib
-            * (1 - cull / 100 * (1 - dens_prop))
-            * wdsg
-            * WEIGHT_CUBIC_FOOT_WATER
-        )
+        if cull > 0:
+            dens_prop = 0.54 if REF_SPECIES[spcd]["SFTWD_HRDWD"] == "H" else 0.92
+            return (
+                v_tot_ib
+                * (1 - cull / 100 * (1 - dens_prop))
+                * wdsg
+                * WEIGHT_CUBIC_FOOT_WATER
+            )
+        return v_tot_ib * wdsg * WEIGHT_CUBIC_FOOT_WATER
 
-    # No cull
-    return v_tot_ib * wdsg * WEIGHT_CUBIC_FOOT_WATER
+    # Array path
+    spcd_arr = np.atleast_1d(spcd)
+    dia_arr = np.atleast_1d(dia)
+    ht_arr = np.atleast_1d(ht)
+    div_arr = np.atleast_1d(division)
+    cull_arr = np.atleast_1d(cull)
+
+    # Get volume (will be vectorized through _run_model_form)
+    v_tot_ib = total_inside_bark_wood_volume(spcd_arr, dia_arr, ht_arr, div_arr)
+
+    # Vectorize lookups from REF_SPECIES
+    wdsg_arr = np.array([float(REF_SPECIES[int(s)]["WOOD_SPGR_GREENVOL_DRYWT"]) for s in spcd_arr])
+    dens_prop_arr = np.array([0.54 if REF_SPECIES[int(s)]["SFTWD_HRDWD"] == "H" else 0.92 for s in spcd_arr])
+
+    # Vectorized calculation
+    weight = np.where(
+        cull_arr > 0,
+        v_tot_ib * (1 - cull_arr / 100 * (1 - dens_prop_arr)) * wdsg_arr * WEIGHT_CUBIC_FOOT_WATER,
+        v_tot_ib * wdsg_arr * WEIGHT_CUBIC_FOOT_WATER
+    )
+
+    return weight
 
 
 def total_stem_bark_weight(
-    spcd: int, dia: float, ht: float, division: str = ""
-) -> float:
+    spcd: Union[int, ArrayLike],
+    dia: Union[float, ArrayLike],
+    ht: Union[float, ArrayLike],
+    division: Union[str, ArrayLike] = "",
+) -> Union[float, NDArray]:
     """
     Predict total stem bark biomass as a function of
     D and H. Reduce the prediction if necessary for
@@ -172,7 +234,12 @@ def total_stem_bark_weight(
     return _run_model_form("s6", spcd, dia, ht, division)
 
 
-def total_branch_weight(spcd: int, dia: float, ht: float, division: str = "") -> float:
+def total_branch_weight(
+    spcd: Union[int, ArrayLike],
+    dia: Union[float, ArrayLike],
+    ht: Union[float, ArrayLike],
+    division: Union[str, ArrayLike] = "",
+) -> Union[float, NDArray]:
     """
     Predict total branch biomass as a function of D
     and H. Reduce the prediction if necessary for
@@ -196,8 +263,11 @@ def total_branch_weight(spcd: int, dia: float, ht: float, division: str = "") ->
 
 
 def total_aboveground_biomass(
-    spcd: int, dia: float, ht: float, division: str = ""
-) -> float:
+    spcd: Union[int, ArrayLike],
+    dia: Union[float, ArrayLike],
+    ht: Union[float, ArrayLike],
+    division: Union[str, ArrayLike] = "",
+) -> Union[float, NDArray]:
     """
     Predict total aboveground biomass as a function
     of D and H. Reduce the prediction if necessary
@@ -223,8 +293,11 @@ def total_aboveground_biomass(
 
 
 def total_foliage_dry_weight(
-    spcd: int, dia: float, ht: float, division: str = ""
-) -> float:
+    spcd: Union[int, ArrayLike],
+    dia: Union[float, ArrayLike],
+    ht: Union[float, ArrayLike],
+    division: Union[str, ArrayLike] = "",
+) -> Union[float, NDArray]:
     """
     Directly predict total foliage dry weight as a
     function of D and H. Use the appropriate model
