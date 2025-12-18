@@ -64,16 +64,17 @@ def continuously_variable_model(
     """
     Continuously Variable Model.
 
-    Equation (3) in the GTR.
+    Equation (3) in the GTR-WO-104 (page 11):
+    y = a × D^(a1 × (1 - exp(-b × D))^c1) × H^c
 
     Parameters:
         dia (float): Diameter of the tree.
         ht (float): Height of the tree.
         a (float): Coefficient.
-        a1 (float): Coefficient.
-        b (float): Exponent for diameter.
+        a1 (float): Coefficient in diameter exponent.
+        b (float): Coefficient in exponential term.
         c (float): Exponent for height.
-        c1 (float): Exponent.
+        c1 (float): Exponent for the (1 - exp) term.
         e (float, optional): Constant. Default is 0.
     """
     a = kwargs.get("a")
@@ -82,7 +83,10 @@ def continuously_variable_model(
     c = kwargs.get("c")
     c1 = kwargs.get("c1")
     e = kwargs.get("e", 0)
-    return a * (a1 * ((1 - np.exp(-b * dia)) ** c1)) * (ht**c) + e
+    # GTR Equation 3: y = a × D^(a1 × (1 - exp(-b × D))^c1) × H^c
+    # The diameter exponent is: a1 × (1 - exp(-b × D))^c1
+    diameter_exponent = a1 * ((1 - np.exp(-b * dia)) ** c1)
+    return a * (dia ** diameter_exponent) * (ht ** c) + e
 
 
 def modifed_wiley_model(
