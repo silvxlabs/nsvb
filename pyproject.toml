@@ -1,0 +1,18 @@
+[project]
+name = "nsvb"
+version = "0.1.0"
+description = "National-Scale Volume and Biomass (NSVB) framework for tree estimation"
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.0",
+]
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.1",
+    "mkdocstrings[python]>=1.0.0",
+]
