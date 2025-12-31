@@ -202,6 +202,61 @@ class TestCarbonExample4:
         expected = harm["agb"] * CarbonFractionsLive.SPCD_802
         assert pytest.approx(result, rel=1e-4) == expected
 
+    def test_agb_carbon_with_broken_top(self):
+        """
+        Test carbon content with broken top (ah < ht).
+
+        Uses harmonized AGB with broken-top reduction.
+        """
+        result = calculate_carbon(
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
+            cull=Example4.CULL,
+            ah=Example4.AH,
+            cr=Example4.CR / 100,  # CR is percentage, need 0-1
+        )
+        # Get harmonized AGB with broken top
+        harm = harmonize_components(
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
+            cull=Example4.CULL,
+            ah=Example4.AH,
+            cr=Example4.CR / 100,
+        )
+        expected = harm["agb"] * CarbonFractionsLive.SPCD_802
+        assert pytest.approx(result, rel=1e-4) == expected
+
+    def test_broken_top_reduces_carbon(self):
+        """
+        Verify that broken top (ah < ht) reduces carbon compared to full tree.
+        """
+        # Carbon without broken top
+        carbon_no_bt = calculate_carbon(
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
+            cull=Example4.CULL,
+        )
+
+        # Carbon with broken top
+        carbon_bt = calculate_carbon(
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
+            cull=Example4.CULL,
+            ah=Example4.AH,
+            cr=Example4.CR / 100,
+        )
+
+        # Broken-top carbon should be less than full-tree carbon
+        assert carbon_bt < carbon_no_bt
+
 
 class TestCarbonVectorized:
     """

@@ -1168,6 +1168,7 @@ def harmonize_components(
     division: Union[str, ArrayLike] = "",
     cull: Union[float, ArrayLike] = 0.0,
     ah: Union[float, ArrayLike, None] = None,
+    cr: Union[float, ArrayLike, None] = None,
     decaycd: Union[int, ArrayLike, None] = None,
 ) -> dict:
     """
@@ -1186,6 +1187,11 @@ def harmonize_components(
     - AGBPredictedred = AGBPredicted × AGBReduce
     - ComponentHarmonized = AGBPredictedred × (ComponentRed / AGBComponentred)
 
+    For trees with broken tops (ah < ht), reduces component weights:
+    - Wood weight reduced by missing volume (via volume ratio at AH)
+    - Bark weight reduced by volume ratio at AH
+    - Branch weight reduced by BranchRem factor (requires cr for live trees)
+
     For dead trees (decaycd provided), applies decay proportions from Table 1:
     - Wood weight reduced by DensProp
     - Bark weight reduced by BarkProp
@@ -1198,6 +1204,7 @@ def harmonize_components(
         division: Division code
         cull: Cull percentage (0-100)
         ah: Actual height for broken-top trees (ft)
+        cr: Crown ratio (0-1) for broken-top branch weight reduction
         decaycd: Decay class for dead trees (1-5)
 
     Returns:
@@ -1214,19 +1221,23 @@ def harmonize_components(
 
     # Calculate reduced component weights
     if decaycd is not None:
-        # Dead tree: apply decay proportions
+        # Dead tree: apply decay proportions and broken-top reductions
         w_wood_reduced = total_stem_wood_dry_weight(
             spcd, dia, ht, division, cull=0, ah=ah, decaycd=decaycd
         )
         w_bark_reduced = total_stem_bark_weight(
-            spcd, dia, ht, division, decaycd=decaycd
+            spcd, dia, ht, division, ah=ah, decaycd=decaycd
         )
-        w_branch_reduced = total_branch_weight(spcd, dia, ht, division, decaycd=decaycd)
+        w_branch_reduced = total_branch_weight(
+            spcd, dia, ht, division, ah=ah, cr=cr, decaycd=decaycd
+        )
     else:
-        # Live tree: apply cull to wood only
-        w_wood_reduced = total_stem_wood_dry_weight(spcd, dia, ht, division, cull)
-        w_bark_reduced = w_bark_unreduced
-        w_branch_reduced = w_branch_unreduced
+        # Live tree: apply cull and broken-top reductions
+        w_wood_reduced = total_stem_wood_dry_weight(
+            spcd, dia, ht, division, cull=cull, ah=ah
+        )
+        w_bark_reduced = total_stem_bark_weight(spcd, dia, ht, division, ah=ah)
+        w_branch_reduced = total_branch_weight(spcd, dia, ht, division, ah=ah, cr=cr)
 
     # GTR-WO-104 Step 11: Sum component weights
     # AGBComponent = unreduced component sum
@@ -1859,6 +1870,7 @@ def calculate_carbon(
     division: Union[str, ArrayLike] = "",
     cull: Union[float, ArrayLike] = 0,
     ah: Union[float, ArrayLike, None] = None,
+    cr: Union[float, ArrayLike, None] = None,
     decaycd: Union[int, ArrayLike, None] = None,
 ) -> Union[float, NDArray]:
     """
@@ -1866,7 +1878,7 @@ def calculate_carbon(
 
     GTR-WO-104 Step 13: Carbon = AGB × Carbon_fraction
 
-    For live trees with cull, uses harmonized/reduced AGB.
+    For live trees with cull or broken tops, uses harmonized/reduced AGB.
     For dead trees, applies decay-class-specific carbon fraction.
 
     Parameters:
@@ -1875,7 +1887,8 @@ def calculate_carbon(
         ht: Height in feet
         division: Division code
         cull: Cull percentage (0-100) for live trees
-        ah: Actual height for broken-top trees
+        ah: Actual height for broken-top trees (ft)
+        cr: Crown ratio (0-1) for broken-top branch weight reduction
         decaycd: Decay class for dead trees (1-5)
 
     Returns:
@@ -1885,28 +1898,31 @@ def calculate_carbon(
     carbon_frac = get_carbon_fraction(spcd, decaycd)
 
     # Get biomass
-    # For live trees with cull, use harmonized components
+    # For live trees with cull or broken top, use harmonized components
     is_array = isinstance(spcd, np.ndarray) or isinstance(dia, np.ndarray)
 
+    # Determine if harmonization is needed (cull > 0 or broken top)
+    has_broken_top = ah is not None
+
     if not is_array:
-        if cull > 0 and decaycd is None:
-            # Live tree with cull: use harmonized AGB
+        if (cull > 0 or has_broken_top) and decaycd is None:
+            # Live tree with cull or broken top: use harmonized AGB
             result = harmonize_components(
-                spcd=spcd, dia=dia, ht=ht, division=division, cull=cull
+                spcd=spcd, dia=dia, ht=ht, division=division, cull=cull, ah=ah, cr=cr
             )
             agb = result["agb"]
         else:
-            # Live tree without cull or dead tree
+            # Live tree without cull/broken top or dead tree
             agb = total_aboveground_biomass(
                 spcd=spcd, dia=dia, ht=ht, division=division
             )
     else:
         cull_arr = np.atleast_1d(cull)
 
-        # Check if any trees have cull
-        if np.any(cull_arr > 0) and decaycd is None:
+        # Check if any trees have cull or broken top
+        if (np.any(cull_arr > 0) or has_broken_top) and decaycd is None:
             result = harmonize_components(
-                spcd=spcd, dia=dia, ht=ht, division=division, cull=cull
+                spcd=spcd, dia=dia, ht=ht, division=division, cull=cull, ah=ah, cr=cr
             )
             agb = result["agb"]
         else:

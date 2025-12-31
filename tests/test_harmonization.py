@@ -272,6 +272,97 @@ class TestHarmonizationExample4:
         assert pytest.approx(component_sum, rel=1e-6) == result["agb"]
 
 
+class TestHarmonizationBrokenTop:
+    """
+    Tests for component harmonization with broken tops (ah < ht).
+
+    Example 4: White oak (SPCD=802), D=18.1", H=65', AH=59', Division=M220, CULL=2%
+
+    Tests that:
+    1. Broken-top reduces component weights and AGB
+    2. Components still sum to AGB after harmonization
+    3. ah parameter is properly propagated through harmonization
+    """
+
+    def test_harmonize_with_broken_top_reduces_agb(self):
+        """
+        Verify that harmonization with broken top (ah < ht) produces lower AGB
+        than without broken top.
+        """
+        # Without broken top
+        result_no_bt = harmonize_components(
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
+            cull=Example4.CULL,
+        )
+
+        # With broken top
+        result_bt = harmonize_components(
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
+            cull=Example4.CULL,
+            ah=Example4.AH,
+            cr=Example4.CR / 100,  # CR is percentage, need 0-1
+        )
+
+        # Broken-top AGB should be less than full-tree AGB
+        assert result_bt["agb"] < result_no_bt["agb"]
+        assert result_bt["wood"] < result_no_bt["wood"]
+        assert result_bt["bark"] < result_no_bt["bark"]
+        assert result_bt["branch"] < result_no_bt["branch"]
+
+    def test_harmonized_components_sum_to_agb_with_broken_top(self):
+        """
+        Verify that harmonized components sum to reduced AGB for broken-top tree.
+
+        This is the key property of harmonization (GTR Step 12).
+        """
+        result = harmonize_components(
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
+            cull=Example4.CULL,
+            ah=Example4.AH,
+            cr=Example4.CR / 100,
+        )
+
+        component_sum = result["wood"] + result["bark"] + result["branch"]
+        assert pytest.approx(component_sum, rel=1e-6) == result["agb"]
+
+    def test_harmonize_no_broken_top_when_ah_equals_ht(self):
+        """
+        Verify that when ah == ht (no broken top), results match no-ah case.
+        """
+        # Without ah parameter
+        result_no_ah = harmonize_components(
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
+            cull=Example4.CULL,
+        )
+
+        # With ah == ht (tree is not actually broken)
+        result_ah_eq_ht = harmonize_components(
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
+            cull=Example4.CULL,
+            ah=Example4.HT,  # No broken top when ah == ht
+            cr=Example4.CR / 100,
+        )
+
+        # Results should be identical
+        assert pytest.approx(result_ah_eq_ht["agb"], rel=1e-6) == result_no_ah["agb"]
+        assert pytest.approx(result_ah_eq_ht["wood"], rel=1e-6) == result_no_ah["wood"]
+
+
 class TestHarmonizationVectorized:
     """
     Tests for vectorized component harmonization.
