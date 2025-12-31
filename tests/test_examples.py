@@ -150,8 +150,11 @@ class TestExample2:
 
         # Test with cull
         result_with_cull = total_stem_wood_dry_weight(
-            Example2.SPCD, Example2.DIA, Example2.HT, Example2.DIVISION,
-            cull=Example2.CULL
+            Example2.SPCD,
+            Example2.DIA,
+            Example2.HT,
+            Example2.DIVISION,
+            cull=Example2.CULL,
         )
         assert pytest.approx(result_with_cull, rel=1e-4) == Example2.W_TOTIBRED_GTR
 
@@ -417,7 +420,9 @@ class TestExample4:
         Note: FoliageRem uses the same formula.
         """
         crh = calculate_crh(ah=Example4.AH, ht=Example4.HT, cr=Example4.CR / 100)
-        result = calculate_branch_foliage_remaining(ah=Example4.AH, ht=Example4.HT, crh=crh)
+        result = calculate_branch_foliage_remaining(
+            ah=Example4.AH, ht=Example4.HT, crh=crh
+        )
         assert pytest.approx(result, rel=1e-6) == Example4.BRANCH_REM_GTR
 
     def test_total_stem_wood_dry_weight_with_broken_top(self):
@@ -514,12 +519,16 @@ class TestVectorized:
     spcd = np.array([Example1.SPCD, Example2.SPCD, Example3.SPCD, Example4.SPCD])
     dia = np.array([Example1.DIA, Example2.DIA, Example3.DIA, Example4.DIA])
     ht = np.array([Example1.HT, Example2.HT, Example3.HT, Example4.HT])
-    division = np.array([Example1.DIVISION, Example2.DIVISION, Example3.DIVISION, Example4.DIVISION])
+    division = np.array(
+        [Example1.DIVISION, Example2.DIVISION, Example3.DIVISION, Example4.DIVISION]
+    )
     cull = np.array([Example1.CULL, Example2.CULL, 0, Example4.CULL])
 
     def test_inside_bark_wood_volume(self):
         """Vectorized inside bark volume matches GTR examples."""
-        result = total_inside_bark_wood_volume(self.spcd, self.dia, self.ht, self.division)
+        result = total_inside_bark_wood_volume(
+            self.spcd, self.dia, self.ht, self.division
+        )
 
         assert isinstance(result, np.ndarray)
         assert len(result) == 4
@@ -553,7 +562,9 @@ class TestVectorized:
         assert len(result_no_cull) == 4
 
         assert pytest.approx(result_no_cull[0], rel=1e-4) == Example1.W_TOTIB_GTR
-        assert pytest.approx(result_no_cull[1], rel=1e-4) == Example2.W_TOTIB_NO_CULL_GTR
+        assert (
+            pytest.approx(result_no_cull[1], rel=1e-4) == Example2.W_TOTIB_NO_CULL_GTR
+        )
         assert pytest.approx(result_no_cull[2], rel=1e-4) == Example3.W_TOTIB_GTR
         assert pytest.approx(result_no_cull[3], rel=1e-4) == Example4.W_TOTIB_GTR
 
@@ -565,9 +576,15 @@ class TestVectorized:
         assert isinstance(result_with_cull, np.ndarray)
         assert len(result_with_cull) == 4
 
-        assert pytest.approx(result_with_cull[0], rel=1e-4) == Example1.W_TOTIB_GTR  # cull=0
-        assert pytest.approx(result_with_cull[1], rel=1e-4) == Example2.W_TOTIBRED_GTR  # cull=3
-        assert pytest.approx(result_with_cull[2], rel=1e-4) == Example3.W_TOTIB_GTR  # cull=0
+        assert (
+            pytest.approx(result_with_cull[0], rel=1e-4) == Example1.W_TOTIB_GTR
+        )  # cull=0
+        assert (
+            pytest.approx(result_with_cull[1], rel=1e-4) == Example2.W_TOTIBRED_GTR
+        )  # cull=3
+        assert (
+            pytest.approx(result_with_cull[2], rel=1e-4) == Example3.W_TOTIB_GTR
+        )  # cull=0
 
     def test_total_stem_bark_weight(self):
         """Vectorized stem bark weight matches GTR examples."""

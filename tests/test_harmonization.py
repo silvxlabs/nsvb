@@ -8,7 +8,6 @@ import numpy as np
 import pytest
 
 from nsvb.estimators import (
-    total_inside_bark_wood_volume,
     total_stem_wood_dry_weight,
     total_stem_bark_weight,
     total_branch_weight,
@@ -41,25 +40,37 @@ class TestHarmonizationExample1:
         """Verify component weight predictions match GTR Example 1."""
         # Stem wood weight
         w_wood = total_stem_wood_dry_weight(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         assert pytest.approx(w_wood, rel=1e-4) == Example1.W_TOTIB_GTR
 
         # Stem bark weight
         w_bark = total_stem_bark_weight(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         assert pytest.approx(w_bark, rel=1e-4) == Example1.W_TOTBK_GTR
 
         # Branch weight
         w_branch = total_branch_weight(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         assert pytest.approx(w_branch, rel=1e-4) == Example1.W_BRANCH_GTR
 
         # Predicted AGB
         agb_pred = total_aboveground_biomass(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         assert pytest.approx(agb_pred, rel=1e-4) == Example1.AGB_PREDICTED_GTR
 
@@ -94,7 +105,9 @@ class TestHarmonizationExample1:
         # Check harmonized values match GTR Example 1
         assert pytest.approx(result["wood"], rel=1e-4) == Example1.WOOD_HARMONIZED_GTR
         assert pytest.approx(result["bark"], rel=1e-4) == Example1.BARK_HARMONIZED_GTR
-        assert pytest.approx(result["branch"], rel=1e-4) == Example1.BRANCH_HARMONIZED_GTR
+        assert (
+            pytest.approx(result["branch"], rel=1e-4) == Example1.BRANCH_HARMONIZED_GTR
+        )
         assert pytest.approx(result["agb"], rel=1e-4) == Example1.AGB_PREDICTED_GTR
 
     def test_harmonized_components_sum_to_agb(self):
@@ -153,7 +166,9 @@ class TestHarmonizationExample2:
         # Check harmonized values match GTR Example 2
         assert pytest.approx(result["wood"], rel=1e-4) == Example2.WOOD_HARMONIZED_GTR
         assert pytest.approx(result["bark"], rel=1e-4) == Example2.BARK_HARMONIZED_GTR
-        assert pytest.approx(result["branch"], rel=1e-4) == Example2.BRANCH_HARMONIZED_GTR
+        assert (
+            pytest.approx(result["branch"], rel=1e-4) == Example2.BRANCH_HARMONIZED_GTR
+        )
         assert pytest.approx(result["agb"], rel=1e-4) == Example2.AGB_PREDICTED_RED_GTR
 
     def test_harmonized_components_sum_to_reduced_agb(self):
@@ -185,21 +200,30 @@ class TestHarmonizationExample4:
         """Verify component weight predictions for Example 4."""
         # Stem wood weight
         w_wood = total_stem_wood_dry_weight(
-            spcd=Example4.SPCD, dia=Example4.DIA, ht=Example4.HT, division=Example4.DIVISION
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
         )
         # GTR page 21: Wtotib = 1582.882064271140
         assert pytest.approx(w_wood, rel=1e-4) == Example4.W_TOTIB_GTR
 
         # Stem bark weight
         w_bark = total_stem_bark_weight(
-            spcd=Example4.SPCD, dia=Example4.DIA, ht=Example4.HT, division=Example4.DIVISION
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
         )
         # GTR page 22: Wtotbk = 237.154413924445
         assert pytest.approx(w_bark, rel=1e-4) == Example4.W_TOTBK_GTR
 
         # Branch weight
         w_branch = total_branch_weight(
-            spcd=Example4.SPCD, dia=Example4.DIA, ht=Example4.HT, division=Example4.DIVISION
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
         )
         # GTR page 22: Wbranch = 770.251512414918
         assert pytest.approx(w_branch, rel=1e-4) == Example4.W_BRANCH_GTR
@@ -225,7 +249,10 @@ class TestHarmonizationExample4:
 
         # Verify AGB is reduced from no-cull prediction
         agb_no_cull = total_aboveground_biomass(
-            spcd=Example4.SPCD, dia=Example4.DIA, ht=Example4.HT, division=Example4.DIVISION
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
         )
         assert result["agb"] < agb_no_cull
 
@@ -273,11 +300,25 @@ class TestHarmonizationVectorized:
         assert len(result["wood"]) == 2
 
         # Example 1 values (no cull)
-        assert pytest.approx(result["wood"][0], rel=1e-4) == Example1.WOOD_HARMONIZED_GTR
-        assert pytest.approx(result["bark"][0], rel=1e-4) == Example1.BARK_HARMONIZED_GTR
-        assert pytest.approx(result["branch"][0], rel=1e-4) == Example1.BRANCH_HARMONIZED_GTR
+        assert (
+            pytest.approx(result["wood"][0], rel=1e-4) == Example1.WOOD_HARMONIZED_GTR
+        )
+        assert (
+            pytest.approx(result["bark"][0], rel=1e-4) == Example1.BARK_HARMONIZED_GTR
+        )
+        assert (
+            pytest.approx(result["branch"][0], rel=1e-4)
+            == Example1.BRANCH_HARMONIZED_GTR
+        )
 
         # Example 2 values (with cull)
-        assert pytest.approx(result["wood"][1], rel=1e-4) == Example2.WOOD_HARMONIZED_GTR
-        assert pytest.approx(result["bark"][1], rel=1e-4) == Example2.BARK_HARMONIZED_GTR
-        assert pytest.approx(result["branch"][1], rel=1e-4) == Example2.BRANCH_HARMONIZED_GTR
+        assert (
+            pytest.approx(result["wood"][1], rel=1e-4) == Example2.WOOD_HARMONIZED_GTR
+        )
+        assert (
+            pytest.approx(result["bark"][1], rel=1e-4) == Example2.BARK_HARMONIZED_GTR
+        )
+        assert (
+            pytest.approx(result["branch"][1], rel=1e-4)
+            == Example2.BRANCH_HARMONIZED_GTR
+        )

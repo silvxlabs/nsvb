@@ -36,6 +36,7 @@ def _run_model_form(
     Returns:
         float: Model form result.
     """
+
     # Scalar implementation (unchanged)
     def _scalar_lookup(spcd_val, dia_val, ht_val, div_val):
         try:
@@ -54,7 +55,11 @@ def _run_model_form(
         return model_function(dia_val, ht_val, **data)
 
     # Check if inputs are arrays
-    is_array = isinstance(spcd, np.ndarray) or isinstance(dia, np.ndarray) or isinstance(ht, np.ndarray)
+    is_array = (
+        isinstance(spcd, np.ndarray)
+        or isinstance(dia, np.ndarray)
+        or isinstance(ht, np.ndarray)
+    )
 
     if is_array:
         # Vectorize the scalar function
@@ -248,27 +253,38 @@ def total_stem_wood_dry_weight(
     decaycd_arr = np.atleast_1d(decaycd) if decaycd is not None else None
 
     # Get volume (will be vectorized through _run_model_form)
-    v_tot_ib = total_inside_bark_wood_volume(spcd_arr, dia_arr, ht_arr, div_arr, ah=ah_arr)
+    v_tot_ib = total_inside_bark_wood_volume(
+        spcd_arr, dia_arr, ht_arr, div_arr, ah=ah_arr
+    )
 
     # Vectorize lookups from REF_SPECIES
-    wdsg_arr = np.array([float(REF_SPECIES[int(s)]["WOOD_SPGR_GREENVOL_DRYWT"]) for s in spcd_arr])
+    wdsg_arr = np.array(
+        [float(REF_SPECIES[int(s)]["WOOD_SPGR_GREENVOL_DRYWT"]) for s in spcd_arr]
+    )
 
     # Dead tree path (decaycd provided)
     if decaycd_arr is not None:
-        dens_prop_arr = np.array([
-            get_decay_proportions(int(s), int(d))["dens_prop"]
-            for s, d in zip(spcd_arr, decaycd_arr)
-        ])
+        dens_prop_arr = np.array(
+            [
+                get_decay_proportions(int(s), int(d))["dens_prop"]
+                for s, d in zip(spcd_arr, decaycd_arr)
+            ]
+        )
         return v_tot_ib * wdsg_arr * dens_prop_arr * WEIGHT_CUBIC_FOOT_WATER
 
     # Live tree path
-    dens_prop_arr = np.array([0.54 if REF_SPECIES[int(s)]["SFTWD_HRDWD"] == "H" else 0.92 for s in spcd_arr])
+    dens_prop_arr = np.array(
+        [0.54 if REF_SPECIES[int(s)]["SFTWD_HRDWD"] == "H" else 0.92 for s in spcd_arr]
+    )
 
     # Vectorized calculation
     weight = np.where(
         cull_arr > 0,
-        v_tot_ib * (1 - cull_arr / 100 * (1 - dens_prop_arr)) * wdsg_arr * WEIGHT_CUBIC_FOOT_WATER,
-        v_tot_ib * wdsg_arr * WEIGHT_CUBIC_FOOT_WATER
+        v_tot_ib
+        * (1 - cull_arr / 100 * (1 - dens_prop_arr))
+        * wdsg_arr
+        * WEIGHT_CUBIC_FOOT_WATER,
+        v_tot_ib * wdsg_arr * WEIGHT_CUBIC_FOOT_WATER,
     )
 
     return weight
@@ -607,6 +623,7 @@ def volume_ratio(
     Returns:
         Volume ratio at height h (0-1)
     """
+
     def _scalar_volume_ratio(spcd_val, h_val, ht_val, div_val):
         coefs = _get_volume_ratio_coefficients(int(spcd_val), str(div_val), bark)
         alpha = coefs["alpha"]
@@ -614,7 +631,11 @@ def volume_ratio(
         # GTR-WO-104 Equation 6 (page 11): R = [1 - (1 - h/H)^α]^β
         return (1 - (1 - h_val / ht_val) ** alpha) ** beta
 
-    is_array = isinstance(spcd, np.ndarray) or isinstance(h, np.ndarray) or isinstance(ht, np.ndarray)
+    is_array = (
+        isinstance(spcd, np.ndarray)
+        or isinstance(h, np.ndarray)
+        or isinstance(ht, np.ndarray)
+    )
 
     if is_array:
         vectorized_fn = np.vectorize(_scalar_volume_ratio)
@@ -724,13 +745,15 @@ def height_to_diameter(
             if t <= 0:
                 return 0.0
 
-            r_term = 1 - t ** alpha  # (1 - t^α)
+            r_term = 1 - t**alpha  # (1 - t^α)
             if r_term <= 0:
                 r_term = 1e-10
 
             # Compute diameter using Equation 7 from GTR page 14
-            volume_term = a * (dia_val ** b) * (ht_val ** c)
-            ratio_derivative = alpha * beta * (t ** (alpha - 1)) * (r_term ** (beta - 1))
+            volume_term = a * (dia_val**b) * (ht_val**c)
+            ratio_derivative = (
+                alpha * beta * (t ** (alpha - 1)) * (r_term ** (beta - 1))
+            )
             diameter = np.sqrt(volume_term / (K * ht_val) * ratio_derivative)
 
             return diameter
@@ -759,7 +782,11 @@ def height_to_diameter(
             # If no root found in range, return the closest bound
             return ht_val
 
-    is_array = isinstance(spcd, np.ndarray) or isinstance(dia, np.ndarray) or isinstance(ht, np.ndarray)
+    is_array = (
+        isinstance(spcd, np.ndarray)
+        or isinstance(dia, np.ndarray)
+        or isinstance(ht, np.ndarray)
+    )
 
     if is_array:
         vectorized_fn = np.vectorize(_scalar_height_to_diameter)
@@ -816,13 +843,18 @@ def sawlog_height(
     Returns:
         Height to sawlog top diameter (ft)
     """
+
     def _scalar_sawlog_height(spcd_val, dia_val, ht_val, div_val):
         spcd_int = int(spcd_val)
         # GTR-WO-104: Softwoods (SPCD < 300) use 7.0" top, hardwoods use 9.0" top
         sawlog_top = 7.0 if spcd_int < 300 else 9.0
         return height_to_diameter(spcd_int, dia_val, ht_val, sawlog_top, div_val)
 
-    is_array = isinstance(spcd, np.ndarray) or isinstance(dia, np.ndarray) or isinstance(ht, np.ndarray)
+    is_array = (
+        isinstance(spcd, np.ndarray)
+        or isinstance(dia, np.ndarray)
+        or isinstance(ht, np.ndarray)
+    )
 
     if is_array:
         vectorized_fn = np.vectorize(_scalar_sawlog_height)
@@ -1186,7 +1218,9 @@ def harmonize_components(
         w_wood_reduced = total_stem_wood_dry_weight(
             spcd, dia, ht, division, cull=0, ah=ah, decaycd=decaycd
         )
-        w_bark_reduced = total_stem_bark_weight(spcd, dia, ht, division, decaycd=decaycd)
+        w_bark_reduced = total_stem_bark_weight(
+            spcd, dia, ht, division, decaycd=decaycd
+        )
         w_branch_reduced = total_branch_weight(spcd, dia, ht, division, decaycd=decaycd)
     else:
         # Live tree: apply cull to wood only
@@ -1520,9 +1554,7 @@ def get_carbon_fraction(
             result.append(CARBON_FRACTIONS_DEAD[(int(d), wood_type_key)])
         return np.array(result)
     else:
-        return np.array([
-            CARBON_FRACTIONS_LIVE[int(s)] for s in spcd_arr
-        ])
+        return np.array([CARBON_FRACTIONS_LIVE[int(s)] for s in spcd_arr])
 
 
 # =============================================================================
@@ -1865,9 +1897,10 @@ def calculate_carbon(
             agb = result["agb"]
         else:
             # Live tree without cull or dead tree
-            agb = total_aboveground_biomass(spcd=spcd, dia=dia, ht=ht, division=division)
+            agb = total_aboveground_biomass(
+                spcd=spcd, dia=dia, ht=ht, division=division
+            )
     else:
-        spcd_arr = np.atleast_1d(spcd)
         cull_arr = np.atleast_1d(cull)
 
         # Check if any trees have cull
@@ -1877,6 +1910,8 @@ def calculate_carbon(
             )
             agb = result["agb"]
         else:
-            agb = total_aboveground_biomass(spcd=spcd, dia=dia, ht=ht, division=division)
+            agb = total_aboveground_biomass(
+                spcd=spcd, dia=dia, ht=ht, division=division
+            )
 
     return agb * carbon_frac

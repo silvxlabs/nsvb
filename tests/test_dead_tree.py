@@ -132,7 +132,10 @@ class TestDeadTreeExample3:
         From GTR Example 3 (page 16).
         """
         result = total_inside_bark_wood_volume(
-            spcd=Example3.SPCD, dia=Example3.DIA, ht=Example3.HT, division=Example3.DIVISION
+            spcd=Example3.SPCD,
+            dia=Example3.DIA,
+            ht=Example3.HT,
+            division=Example3.DIVISION,
         )
         assert pytest.approx(result, rel=1e-4) == Example3.V_TOTIB_GROSS_GTR
 
@@ -170,7 +173,10 @@ class TestDeadTreeExample3:
         """
         # Calculate without decay reduction (live tree equivalent)
         v_gross = total_inside_bark_wood_volume(
-            spcd=Example3.SPCD, dia=Example3.DIA, ht=Example3.HT, division=Example3.DIVISION
+            spcd=Example3.SPCD,
+            dia=Example3.DIA,
+            ht=Example3.HT,
+            division=Example3.DIVISION,
         )
         wdsg = 0.58  # From REF_SPECIES for SPCD=631
         w_totib = v_gross * wdsg * 62.4
@@ -344,7 +350,10 @@ class TestDeadTreeExample3:
 
         # AGB should be reduced from live tree value
         live_agb = total_aboveground_biomass(
-            spcd=Example3.SPCD, dia=Example3.DIA, ht=Example3.HT, division=Example3.DIVISION
+            spcd=Example3.SPCD,
+            dia=Example3.DIA,
+            ht=Example3.HT,
+            division=Example3.DIVISION,
         )
         assert result["agb"] < live_agb
 
@@ -478,4 +487,3 @@ class TestDeadTreeVectorized:
         for i in range(2):
             component_sum = result["wood"][i] + result["bark"][i] + result["branch"][i]
             assert pytest.approx(component_sum, rel=1e-6) == result["agb"][i]
-

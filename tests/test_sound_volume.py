@@ -156,15 +156,23 @@ class TestSoundVolumeVectorized:
 
         # First tree has no cull, sound = gross
         v_gross_1 = total_inside_bark_wood_volume(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         assert pytest.approx(result[0], rel=1e-4) == v_gross_1
 
         # Second tree has 3% cull
         v_gross_2 = total_inside_bark_wood_volume(
-            spcd=Example2.SPCD, dia=Example2.DIA, ht=Example2.HT, division=Example2.DIVISION
+            spcd=Example2.SPCD,
+            dia=Example2.DIA,
+            ht=Example2.HT,
+            division=Example2.DIVISION,
         )
-        assert pytest.approx(result[1], rel=1e-4) == v_gross_2 * (1 - Example2.CULL / 100)
+        assert pytest.approx(result[1], rel=1e-4) == v_gross_2 * (
+            1 - Example2.CULL / 100
+        )
 
 
 class TestSoundVolumeEdgeCases:
@@ -190,7 +198,10 @@ class TestSoundVolumeEdgeCases:
         Test with a high cull percentage (50%).
         """
         v_gross = total_inside_bark_wood_volume(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         result = sound_inside_bark_volume(
             spcd=Example1.SPCD,

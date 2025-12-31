@@ -24,4 +24,3 @@ packages = ["nsvb"]
 [dependency-groups]
 dev = ["pytest"]
 docs = ["mkdocs", "mkdocs-material", "mkdocstrings[python]"]
-

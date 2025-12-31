@@ -54,7 +54,7 @@ def segmented_model(
     return np.where(
         dia < k,
         a * (dia**b) * (ht**c) + e,
-        a * (k ** (b - b1)) * (dia**b1) * (ht**c) + e
+        a * (k ** (b - b1)) * (dia**b1) * (ht**c) + e,
     )
 
 
@@ -86,7 +86,7 @@ def continuously_variable_model(
     # GTR Equation 3: y = a × D^(a1 × (1 - exp(-b × D))^c1) × H^c
     # The diameter exponent is: a1 × (1 - exp(-b × D))^c1
     diameter_exponent = a1 * ((1 - np.exp(-b * dia)) ** c1)
-    return a * (dia ** diameter_exponent) * (ht ** c) + e
+    return a * (dia**diameter_exponent) * (ht**c) + e
 
 
 def modified_wiley_model(

@@ -12,6 +12,7 @@ Reference: GTR-WO-104 "National-Scale Volume and Biomass (NSVB) Framework"
 # GTR pages 10-12
 # =============================================================================
 
+
 class Example1:
     """GTR Example 1 expected values."""
 
@@ -64,6 +65,7 @@ class Example1:
 # GTR pages 14-15
 # =============================================================================
 
+
 class Example2:
     """GTR Example 2 expected values."""
 
@@ -110,6 +112,7 @@ class Example2:
 # EXAMPLE 3: Dead Tanoak (SPCD=631), D=11.3", H=28', AH=21', DECAYCD=2
 # GTR pages 16-20
 # =============================================================================
+
 
 class Example3:
     """GTR Example 3 expected values (dead tree with broken top)."""
@@ -169,6 +172,7 @@ class Example3:
 # GTR pages 21-23
 # =============================================================================
 
+
 class Example4:
     """GTR Example 4 expected values (live tree with broken top)."""
 
@@ -217,6 +221,7 @@ class Example4:
 # CARBON FRACTIONS (Table S10a - Live Trees)
 # =============================================================================
 
+
 class CarbonFractionsLive:
     """Carbon fractions for live trees from Table S10a."""
 
@@ -229,6 +234,7 @@ class CarbonFractionsLive:
 # =============================================================================
 # CARBON FRACTIONS (Table S10b - Dead Trees)
 # =============================================================================
+
 
 class CarbonFractionsDead:
     """Carbon fractions for dead trees from Table S10b."""
@@ -253,6 +259,7 @@ class CarbonFractionsDead:
 # =============================================================================
 # DECAY PROPORTIONS (Table 1)
 # =============================================================================
+
 
 class DecayProportions:
     """Decay proportions from GTR Table 1."""
@@ -281,6 +288,7 @@ class DecayProportions:
 # =============================================================================
 # WOOD SPECIFIC GRAVITY (from REF_SPECIES)
 # =============================================================================
+
 
 class WoodSpecificGravity:
     """Wood specific gravity values from FIADB REF_SPECIES."""

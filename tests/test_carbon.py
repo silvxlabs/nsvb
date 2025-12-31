@@ -18,7 +18,9 @@ from nsvb.estimators import (
 )
 
 from .gtr_values import (
-    Example1, Example2, Example4,
+    Example1,
+    Example2,
+    Example4,
     CarbonFractionsLive,
 )
 
@@ -113,13 +115,19 @@ class TestCarbonExample1:
         Carbon = AGB × Carbon_fraction
         """
         agb = total_aboveground_biomass(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         # Verify AGB matches GTR Example 1
         assert pytest.approx(agb, rel=1e-4) == Example1.AGB_PREDICTED_GTR
 
         result = calculate_carbon(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         # Carbon = AGB × Carbon_fraction from Table S10a
         expected = Example1.AGB_PREDICTED_GTR * CarbonFractionsLive.SPCD_202
@@ -216,10 +224,16 @@ class TestCarbonVectorized:
         assert len(result) == 2
 
         # Example 1: Carbon = AGB × Carbon_fraction from Table S10a
-        assert pytest.approx(result[0], rel=1e-4) == Example1.AGB_PREDICTED_GTR * CarbonFractionsLive.SPCD_202
+        assert (
+            pytest.approx(result[0], rel=1e-4)
+            == Example1.AGB_PREDICTED_GTR * CarbonFractionsLive.SPCD_202
+        )
 
         # Example 2: Carbon = AGBred × Carbon_fraction from Table S10a
-        assert pytest.approx(result[1], rel=1e-4) == Example2.AGB_PREDICTED_RED_GTR * CarbonFractionsLive.SPCD_316
+        assert (
+            pytest.approx(result[1], rel=1e-4)
+            == Example2.AGB_PREDICTED_RED_GTR * CarbonFractionsLive.SPCD_316
+        )
 
     def test_carbon_fraction_vectorized(self):
         """Test that get_carbon_fraction works with array inputs."""
@@ -228,6 +242,12 @@ class TestCarbonVectorized:
 
         assert isinstance(result, np.ndarray)
         assert len(result) == 3
-        assert pytest.approx(result[0], rel=1e-6) == CarbonFractionsLive.SPCD_202  # Douglas-fir
-        assert pytest.approx(result[1], rel=1e-6) == CarbonFractionsLive.SPCD_316  # Red maple
-        assert pytest.approx(result[2], rel=1e-6) == CarbonFractionsLive.SPCD_631  # Tanoak
+        assert (
+            pytest.approx(result[0], rel=1e-6) == CarbonFractionsLive.SPCD_202
+        )  # Douglas-fir
+        assert (
+            pytest.approx(result[1], rel=1e-6) == CarbonFractionsLive.SPCD_316
+        )  # Red maple
+        assert (
+            pytest.approx(result[2], rel=1e-6) == CarbonFractionsLive.SPCD_631
+        )  # Tanoak

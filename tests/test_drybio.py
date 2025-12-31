@@ -53,7 +53,10 @@ class TestDrybioExample1:
         Expected = 60.11 lb
         """
         result = drybio_stump(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         # R1 × Wstemwd
         expected = Example1.R1_GTR * Example1.W_TOTIB_GTR
@@ -68,7 +71,10 @@ class TestDrybioExample1:
         Wstemwd = 2483.739897283610 lb
         """
         result = drybio_bole(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         # (Rm - R1) × Wstemwd
         expected = (Example1.RM_GTR - Example1.R1_GTR) * Example1.W_TOTIB_GTR
@@ -82,10 +88,15 @@ class TestDrybioExample1:
         Wstemwd = 2483.739897283610 lb
         """
         result = drybio_top(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         # Calculate using actual Rm
-        hm = merchantable_height(Example1.SPCD, Example1.DIA, Example1.HT, Example1.DIVISION)
+        hm = merchantable_height(
+            Example1.SPCD, Example1.DIA, Example1.HT, Example1.DIVISION
+        )
         rm = volume_ratio(Example1.SPCD, hm, Example1.HT, Example1.DIVISION, bark="ib")
         expected = (1 - rm) * Example1.W_TOTIB_GTR
         assert pytest.approx(result, rel=1e-4) == expected
@@ -95,16 +106,28 @@ class TestDrybioExample1:
         DRYBIO_STUMP + DRYBIO_BOLE + DRYBIO_TOP should equal total stem weight.
         """
         stump = drybio_stump(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         bole = drybio_bole(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         top = drybio_top(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
         total = total_stem_wood_dry_weight(
-            spcd=Example1.SPCD, dia=Example1.DIA, ht=Example1.HT, division=Example1.DIVISION
+            spcd=Example1.SPCD,
+            dia=Example1.DIA,
+            ht=Example1.HT,
+            division=Example1.DIVISION,
         )
 
         assert pytest.approx(stump + bole + top, rel=1e-6) == total
@@ -249,7 +272,9 @@ class TestDrybioBrokenTop:
         If ah > hm, bole is same as full tree.
         If ah < hm, bole uses ah as upper limit.
         """
-        hm = merchantable_height(Example4.SPCD, Example4.DIA, Example4.HT, Example4.DIVISION)
+        hm = merchantable_height(
+            Example4.SPCD, Example4.DIA, Example4.HT, Example4.DIVISION
+        )
 
         result = drybio_bole(
             spcd=Example4.SPCD,
@@ -264,10 +289,15 @@ class TestDrybioBrokenTop:
 
         # Use lesser of ah and hm
         h_upper = min(Example4.AH, hm)
-        r_upper = volume_ratio(Example4.SPCD, h_upper, Example4.HT, Example4.DIVISION, bark="ib")
+        r_upper = volume_ratio(
+            Example4.SPCD, h_upper, Example4.HT, Example4.DIVISION, bark="ib"
+        )
 
         w_stem = total_stem_wood_dry_weight(
-            spcd=Example4.SPCD, dia=Example4.DIA, ht=Example4.HT, division=Example4.DIVISION
+            spcd=Example4.SPCD,
+            dia=Example4.DIA,
+            ht=Example4.HT,
+            division=Example4.DIVISION,
         )
 
         expected = (r_upper - r1) * w_stem
@@ -279,7 +309,9 @@ class TestDrybioBrokenTop:
 
         DRYBIO_TOP = (R(ah) - Rm) × Wstemwd
         """
-        hm = merchantable_height(Example4.SPCD, Example4.DIA, Example4.HT, Example4.DIVISION)
+        hm = merchantable_height(
+            Example4.SPCD, Example4.DIA, Example4.HT, Example4.DIVISION
+        )
 
         # This example has ah=59' which may be above or below hm depending on tree shape
         result = drybio_top(
@@ -295,10 +327,17 @@ class TestDrybioBrokenTop:
             assert result == 0.0
         else:
             # Broken above merchantable - partial top
-            rm = volume_ratio(Example4.SPCD, hm, Example4.HT, Example4.DIVISION, bark="ib")
-            r_ah = volume_ratio(Example4.SPCD, Example4.AH, Example4.HT, Example4.DIVISION, bark="ib")
+            rm = volume_ratio(
+                Example4.SPCD, hm, Example4.HT, Example4.DIVISION, bark="ib"
+            )
+            r_ah = volume_ratio(
+                Example4.SPCD, Example4.AH, Example4.HT, Example4.DIVISION, bark="ib"
+            )
             w_stem = total_stem_wood_dry_weight(
-                spcd=Example4.SPCD, dia=Example4.DIA, ht=Example4.HT, division=Example4.DIVISION
+                spcd=Example4.SPCD,
+                dia=Example4.DIA,
+                ht=Example4.HT,
+                division=Example4.DIVISION,
             )
             expected = (r_ah - rm) * w_stem
             assert pytest.approx(result, rel=1e-6) == expected
@@ -318,7 +357,9 @@ class TestDrybioBrokenTop:
             division=Example4.DIVISION,
         )
 
-        hm = merchantable_height(Example4.SPCD, Example4.DIA, Example4.HT, Example4.DIVISION)
+        hm = merchantable_height(
+            Example4.SPCD, Example4.DIA, Example4.HT, Example4.DIVISION
+        )
         if ah_low <= hm:
             assert result == 0.0
 
