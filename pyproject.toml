@@ -1,18 +1,27 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
 [project]
 name = "nsvb"
-version = "0.1.0"
-description = "National-Scale Volume and Biomass (NSVB) framework for tree estimation"
-requires-python = ">=3.13"
-dependencies = [
-    "numpy>=2.0.0",
-]
+dynamic = ["version"]
+description = "National Scale Volume and Biomass Estimators"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+dependencies = ["numpy", "scipy"]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=9.0.0",
-]
-docs = [
-    "mkdocs>=1.6.1",
-    "mkdocs-material>=9.7.1",
-    "mkdocstrings[python]>=1.0.0",
-]
+[project.urls]
+Homepage = "https://github.com/silvxlabs/nsvb"
+Repository = "https://github.com/silvxlabs/nsvb"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nsvb"]
+
+[dependency-groups]
+dev = ["pytest"]
+docs = ["mkdocs", "mkdocs-material", "mkdocstrings[python]"]
+

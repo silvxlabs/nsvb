@@ -1,129 +1,94 @@
-name: Release Workflow
+name: Release
 
 on:
   release:
-    types: [ published ]
+    types: [published]
 
 permissions:
   contents: read
 
 jobs:
-  upload-to-test-pypi:
+  build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
         with:
-          python-version: '3.x'
-          cache: pip
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install setuptools wheel twine
+          fetch-depth: 0  # Required for hatch-vcs to get version from tags
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
       - name: Build package
-        run: |
-          python setup.py sdist bdist_wheel
-      - name: Upload to Test PyPi
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        run: |
-          twine upload --repository testpypi dist/*
+        run: uv build
 
-  test-on-test-pypi:
-    needs: upload-to-test-pypi
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
         with:
-          python-version: '3.x'
-          cache: pip
-      - name: Install package from Test PyPi
-        run: |
-          python -m pip install --upgrade pip
-          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple nsvb
-      - name: Install test dependencies
-        run: |
-          pip install pytest
-      - name: Run pytest
-        env:
-          TEST_ENV: test_pypi
-        run: |
-          pytest
+          name: dist
+          path: dist/
 
-  upload-to-pypi:
-    needs: test-on-test-pypi
+  test-pypi:
+    needs: build
     runs-on: ubuntu-latest
-
+    environment: test-pypi
+    permissions:
+      id-token: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Download dist
+        uses: actions/download-artifact@v4
         with:
-          python-version: '3.x'
-          cache: pip
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install setuptools wheel twine
-      - name: Build and publish
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          python setup.py sdist bdist_wheel
-          twine upload dist/*
+          name: dist
+          path: dist/
 
-  test-on-pypi:
-    needs: upload-to-pypi
+      - name: Publish to Test PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  verify-test-pypi:
+    needs: test-pypi
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-          cache: pip
-      - name: Install package from PyPi
-        run: |
-          python -m pip install --upgrade pip
-          pip install nsvb
-      - name: Install test dependencies
-        run: |
-          pip install pytest
-      - name: Run pytest
-        env:
-          TEST_ENV: pypi
-        run: |
-          pytest
+      - uses: actions/checkout@v4
 
-  deploy-docs:
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install from Test PyPI and run tests
+        run: |
+          uv venv
+          uv pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ nsvb
+          uv pip install pytest
+          uv run pytest
+
+  pypi:
+    needs: verify-test-pypi
     runs-on: ubuntu-latest
-
+    environment: pypi
+    permissions:
+      id-token: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Download dist
+        uses: actions/download-artifact@v4
         with:
-          python-version: '3.x'
+          name: dist
+          path: dist/
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install mkdocs mkdocs-material mkdocstrings[python]
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
 
-      - name: Deploy documentation
+  verify-pypi:
+    needs: pypi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install from PyPI and run tests
         run: |
-          mkdocs gh-deploy --force --clean --verbose
+          uv venv
+          uv pip install nsvb
+          uv pip install pytest
+          uv run pytest
