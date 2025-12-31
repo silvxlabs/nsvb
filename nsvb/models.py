@@ -89,7 +89,7 @@ def continuously_variable_model(
     return a * (dia ** diameter_exponent) * (ht ** c) + e
 
 
-def modifed_wiley_model(
+def modified_wiley_model(
     dia: Union[float, ArrayLike], ht: Union[float, ArrayLike], **kwargs
 ) -> Union[float, NDArray]:
     """
@@ -141,6 +141,6 @@ MODEL_MAP = {
     1: schumacher_hall_method,
     2: segmented_model,
     3: continuously_variable_model,
-    4: modifed_wiley_model,
+    4: modified_wiley_model,
     5: modified_schumaker_hall,
 }
