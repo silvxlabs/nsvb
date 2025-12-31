@@ -1,0 +1,36 @@
+site_name: NSVB Documentation
+site_description: National-Scale Volume and Biomass (NSVB) Estimators for Tree Species
+site_url: https://silvxlabs.github.io/nsvb/
+repo_url: https://github.com/silvxlabs/nsvb
+repo_name: silvxlabs/nsvb
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            docstring_section_style: table
+            show_root_heading: true
+            show_signature_annotations: true
+            separate_signature: true
+            members_order: source
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - User Guide: user-guide.md
+  - API Reference: reference.md
