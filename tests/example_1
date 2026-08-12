@@ -1,0 +1,423 @@
+Example 1
+Assume the following measurements were taken for
+a Douglas-fir (Pseudotsuga menziesii; SPCD = 202)
+tree having D = 20.0 inches and H = 110 feet with
+no cull growing in the Marine Division (DIVISION
+= 240). The first step is to predict total stem wood
+volume in cubic feet using the appropriate model
+form and coefficients. The inside-bark wood volume
+coefficient table (table S1a) indicates trees in the
+group 202/240 (i.e., SPCD = 202 and DIVISION = 240)
+use model 2 with the appropriate coefficients:
+VtotibGross = a × k(b – b1) × Db1 × Hc
+VtotibGross = 0.001929099661
+× 9(2.162413104203 – 1.690400253097) × 201.690400253097
+× 1100.985444005253 = 88.452275544288
+Total bark volume is predicted next. Consulting the
+bark volume coefficient table (table S2a) indicates
+the use of model 1 with the appropriate coefficients:
+VtotbkGross = a × Db × Hc
+VtotbkGross = 0.000031886237 × 201.21260513951
+× 1101.978577263767 = 13.191436232306
+Total outside-bark volume is then calculated via
+addition:
+VtotobGross = VtotibGross + VtotbkGross
+VtotobGross = 88.452275544288 + 13.191436232306
+= 101.643711776594
+Note that table S3a provides the information
+needed to directly obtain model predictions of
+VtotobGross. However, this table is not intended
+to be used in this manner as it does not facilitate
+maintaining additive properties nor enable proper
+treatment of the stem wood and bark components
+in terms of reductions for wood cull or dead tree
+decay and loss. The primary use of table S3a is for
+calculating merchantable and sawlog stem volumes.
+Merchantable volumes are defined as the volume
+from a 1-foot stump to a 4.0-inch outside-bark top
+diameter. Sawlog volumes are defined as being
+between a 1-foot stump and a 7.0-inch top diameter
+for softwood species (D≥9.0 inches) and 9.0-inch
+top diameter for hardwood species (D≥11.0 inches).
+Equation 7 can be used to find the height (hi) to any
+top diameter (di); however, it cannot be inverted
+or algebraically rearranged to be solved directly.
+Therefore, iterative methods must be used (i.e.,
+numerical optimization or minimization). For the
+merchantable height to a 4.0-inch top (h
+m), inserting
+the correct coefficient values for a, b, and c from the
+outside-bark volume coefficient table (table S3a)
+and values for α and β from the outside-bark volume
+ratio coefficient table (table S4a) results in the
+following calculation:
+|4 – {0.002916157874 × 201.778795704183
+× 1101.085526548472/0.005454154)/110
+× 2.386864288974 × 0.907607415992
+× (1 – h
+m/110)(2.386864288974 – 1)
+× [1 – (1 – h
+m/110)2.386864288974](0.907607415992 – 1)}0.5|
+Iterative minimization results in h
+=
+m
+98.28126765402. To determine merchantable
+volume, use model 6 and the coefficients from the
+inside-bark volume ratio table (table S5a) to find the
+proportion of total stem volume for both the 1-foot
+stump height and the 4.0-inch top diameter height:
+R1 = [1 – (1 – h1/H)α]β
+R1 = [1 – (1 – 1/110)2.220714200464]0.952218706779
+= 0.024198309503
+R
+m = [1 – (1 – h
+m/H)α]β
+R
+m = [1 – (1 – 98.28126765402/110)2.220714200464]0.95221870
+6779 = 0.993406175350
+where h1 is stump height (1 foot), h
+is the
+m
+merchantable height, R1 is the proportion of volume
+to 1 foot, and R
+m is the proportion of volume to the
+merchantable height.
+Then, multiply the ratios by the already estimated
+total stem wood volume and subtract the stump
+volume to obtain the merchantable stem inside-bark
+volume:
+VmeribGross = (R
+m
+× VtotibGross) – (R1
+× VtotibGross)
+VmeribGross = (0.993406175350 × 88.452275544288)
+– (0.024198309503 × 88.452275544288)
+= 85.728641209612
+The same procedure can be used to estimate the
+merchantable stem outside-bark volume:
+VmerobGross = (R
+m
+× VtotobGross) – (R1
+× VtotobGross)
+VmerobGross = (0.99340617535 × 101.643711776594)
+– (0.024198309503 × 101.643711776594)
+= 98.513884967785
+Note that the same volume ratio coefficients are
+used for both inside-bark and outside-bark ratios to
+ensure consistency. Merchantable stem bark volume
+is then calculated via subtraction:
+VmerbkGross = VmerobGross – VmeribGross
+VmerbkGross = 98.513884967785 – 85.728641209612
+= 12.785243758174
+Calculating cubic-foot volume in the sawlog portion
+of the stem (1-foot stump height to 7.0-inch top
+diameter for softwoods (SPCD<300; D≥9.0 inches)
+and 9.0-inch top diameter for hardwoods (SPCD≥300;
+D≥11.0 inches)) proceeds similarly, with sawlog
+height (h
+s) being obtained from the following
+calculation:
+|7 – {0.002916157874 × 201.778795704183 × 1101.085526548472
+/0.005454154)/110 × 2.386864288974
+× 0.907607415992 × (1 – h
+s/110)(2.386864288974 – 1)
+× [1 – (1 – h
+s/110)2.386864288974](0.907607415992 – 1)}0.5|
+Iterative minimization results in h
+= 83.785181046.
+s
+To determine sawlog volume, use model 6 and
+the coefficients from the inside-bark volume ratio
+table (table S5a) to find the proportion of total stem
+volume for both the 1-foot stump height and the 7.0-
+inch top diameter height (R
+s):
+R1 = [1 – (1 – h1/H)α]β
+R1 = [1 – (1 – 1/110)2.220714200464]0.952218706779
+= 0.024198309503
+R
+s = [1 – (1 – h
+s/H)α]β
+R
+s = [1 – (1 – 83.785181046/110)2.220714200464]0.952218706779
+= 0.960553392655
+where h1 is stump height (1 foot), h
+s is the sawlog
+height, R1 is the proportion of volume to 1 foot and R
+s
+is the proportion of volume to the sawlog height.
+Then, multiply the ratios by the already estimated
+total stem wood volume and subtract:
+VsawibGross = (R
+s
+× VtotibGross) – (R1 × VtotibGross)
+VsawibGross = (0.960553392655 × 88.452275544288)
+– (0.024198309503 × 88.452275544288)
+= 82.822737822255
+The same procedure can be used to estimate the
+sawlog outside-bark volume:
+VsawobGross = (R
+s
+× VtotobGross) – (R1 × VtotobGross)
+VsawobGross = (0.960553392655
+× 101.643711776594) – (0.024198309503
+× 101.643711776594) = 95.174606192451
+Sawlog stem bark volume is then calculated via
+subtraction:
+VsawbkGross = VsawobGross – VsawibGross
+VsawbkGross = 95.174606192451 – 82.822737822255
+= 12.351868370196
+Stump wood and bark volumes are estimated using
+the same volume ratio approach:
+VstumpobGross = R1
+× VtotobGross
+VstumpobGross = 0.024198309503
+× 101.643711776594 = 2.459605996608
+VstumpibGross = R1
+× VtotibGross
+VstumpibGross = 0.024198309503
+× 88.452275544288 = 2.140395539869
+VstumpbkGross = VstumpobGross – VstumpibGross
+VstumpbkGross = 2.459605996608 – 2.140395539869
+= 0.319210456739
+Finally, stem-top volumes are calculated by
+subtracting the other stem volume subcomponents:
+VtopobGross = VtotobGross – VmerobGross
+– VstumpobGross
+VtopobGross = 101.643711776594
+– 98.513884967785 – 2.459605996608
+= 0.670220812201
+VtopibGross = VtotibGross – VmeribGross
+– VstumpibGross
+VtopibGross = 88.452275544288 – 85.728641209612
+– 2.140395539869 = 0.583238794807
+VtopbkGross = VtopobGross – VtopibGross
+VtopbkGross = 0.670220812201 – 0.583238794807
+= 0.086982017394
+The same ratio procedure can be used to estimate
+outside-bark or inside-bark volume between any
+heights and can be used to estimate many product
+classes (i.e., sawlog volumes). Additionally, if bark
+volumes are desired, predict for both outside-bark
+and inside-bark volumes and then subtract (i.e., Vbk
+= Vob – Vib).
+Associated sound wood and bark attributes are also
+needed to account for any rotten/missing cull wood,
+along with any decay reductions that are specified
+for dead trees. Notationally, values designated as
+“Sound” hereafter refer to values occurring after
+considering any deductions due to cull, broken top,
+or dead tree density reductions. Although the tree
+in this example has CULL = 0, it is shown how cull
+would be applied to any inside-bark volumes at this
+point:
+VtotibSound = VtotibGross × (1 – CULL/100)
+VtotibSound = 88.452275544288 × (1 – 0/100)
+= 88.452275544288
+where CULL is the percentage of rotten/missing
+wood in the main stem below any missing top. For
+the example tree used here, all sound attributes are
+equal to their gross counterparts due to the tree
+being alive with no cull.
+
+An outside-bark volume that includes wood cull
+(note that bark volume predictions are unaffected
+by the CULL value) can be determined by adding the
+appropriate bark volume to the sound wood volume
+estimates:
+VtotobSound = VtotibSound + VtotbkSound
+VtotobSound = 88.452275544288 + 13.191436232306
+= 101.643711776594
+Total stem wood volume is converted to total stem
+wood dry weight in pounds (lb) using the wood
+density (specific gravity) value from the FIADB
+REF_SPECIES table, which is 0.45 for SPCD = 202. To
+convert volume to weight, multiply this value by the
+weight of a cubic foot of water (62.4 lb/ft3):
+Wtotib = VtotibGross × WDSG × 62.4
+Wtotib = 88.452275544288 × 0.45 × 62.4
+= 2483.739897283610
+It is considered that most cull material will be
+rotten wood, which would still contribute to the
+stem weight. As such, it is assumed the density
+of cull wood is reduced by the proportion for
+DECAYCD = 3 (see table 1; wood density proportion
+(DensProp) is 0.54 for hardwood species and 0.92
+for softwood species) as reported by Harmon et al.
+(2011) to obtain the reduced weight due to cull. In
+this example, CULL = 0, so no reduction in weight is
+incurred:
+Wtotibred = VtotibGross × [1 – CULL/100
+× (1 – DensProp)] × WDSG × 62.4
+Wtotibred = 88.452275544288 × [1 – 0/100
+× (1 – 0.92)] × 0.45 × 62.4 = 2483.739897283610
+Next, total stem bark weight can be estimated
+using the appropriate model form and coefficients.
+Consulting the stem bark weight coefficient table
+(table S6a), use model 1 with the appropriate
+coefficients:
+Wtotbk = a × Db × Hc
+Wtotbk = 0.009106538193 × 201.437894424586
+× 1101.336514272981 = 361.782496100100
+Total branch weight can then be estimated using the
+appropriate model form and coefficients. Consulting
+the branch weight coefficient table (table S7a), use
+model 1 with the appropriate coefficients:
+Wbranch = a × Db × Hc
+Wbranch = 9.521330809106 × 201.762316117442
+× 110-0.40574259177 = 277.487756904646
+Reductions to bark and branch weights are only
+considered for dead trees and trees with broken
+tops. As neither of these conditions is present in the
+current example, Wtotbkred = Wtotbk and Wbranchred
+= Wbranch.
+Now, total aboveground biomass (AGB) can be
+estimated using the appropriate equation form and
+coefficients. The total biomass coefficient table
+(table S8a) prescribes the use of model 1 with the
+appropriate coefficients:
+AGBPredicted = a × Db × Hc
+AGBPredicted = 0.135206506787 × 201.713527048035
+× 1101.047613377046 = 3154.5539926725
+The next series of steps are designed to ensure
+consistent estimates between the three
+independently estimated components (total stem
+wood weight, total stem bark weight, and branch
+weight) and the predicted total aboveground
+biomass (AGBPredicted). First, estimate a second total
+aboveground biomass by summing the three
+components and then calculate the difference
+between the two AGB estimates:
+AGBComponentred = Wtotibred + Wtotbkred + Wbranchred
+AGBComponentred = 2483.739897283610
++ 361.782496100100 + 277.487756904646
+= 3123.010150288360
+A reduction factor is now calculated to modify
+AGBPredicted to account for any component rot or loss
+(none in this case):
+AGBReduce = AGBComponentred/(Wtotib + Wtotbk + Wbranch)
+AGBReduce = 3123.010150288360/(2483.739897283610
++ 361.782496100100 + 277.487756904646)
+= 1.000000000000
+AGBPredictedred = AGBPredicted × AGBReduce
+AGBPredictedred = 3154.5539926725 × 1.000000000000
+= 3154.5539926725
+AGBDiff = AGBPredictedred – AGBComponentred
+AGBDiff = 3154.5539926725 – 3123.0101502883
+= 31.543842384153
+Next, to harmonize the three components with
+the predicted total aboveground biomass,
+proportionally distribute AGBDiff across the
+components. Mathematically, this can be
+accomplished with the following calculations:
+WoodHarmonized = AGBPredictedred × (Wtotibred/
+AGBComponentred)
+WoodHarmonized = 3154.5539926725 × (2483.739897283
+6/3123.01015028834) = 2508.826815376370
+BarkHarmonized = AGBPredictedred × (Wtotbkred/
+AGBComponentred)
+BarkHarmonized = 3154.5539926725 × (361.7824961001/
+3123.01015028834) = 365.436666110811
+BranchHarmonized = AGBPredictedred × (Wbranchred/
+AGBComponentred)
+BranchHarmonized = 3154.5539926725 × (277.487756904
+647/3123.01015028834) = 280.290511185328
+At this point, all the individual tree components
+have been harmonized and are additive with the
+predicted total aboveground biomass estimate.
+The final biomass component that can be predicted
+is foliage weight. Consulting the foliage weight
+coefficient table (table S9) indicates the use of model
+2 with the appropriate coefficients:
+Wfoliage = a × k(b – b1) × Db1 × Hc
+Wfoliage = 0.477184595914 × 9(2.592670351881 – 1.249237428914)
+× 201.249237428914 ×110-0.325050455055 = 83.634788855934
+Reductions to foliage weight are only considered
+for live trees with a broken top. As no broken top
+is present in the current example, Wfoliagered =
+Wfoliage. Foliage biomass is kept separate from total
+biomass values, which consist of wood, bark, and
+branch mass.
+Finally, calculate a new adjusted wood density using
+the harmonized total stem wood weight and the
+predicted total stem wood volume. Careful attention
+is needed for this calculation because cull is treated
+differently for volume vs. biomass in the NSVB
+framework. The wood volume basis does not include
+a deduction for cull but does include deductions for
+missing wood (i.e., broken top). In this example, no
+cull nor broken top is present such that VtotibGross
+and VtotbkGross are representative of the actual
+existing wood and bark volume, respectively:
+WDSGAdj = WoodHarmonized/VtotibGross/62.4
+WDSGAdj = 2508.826815376370/88.452275544288
+/62.4 = 0.454545207473
+Similarly, an adjusted bark density is calculated
+using the harmonized total stem bark weight and the
+predicted total stem bark volume:
+BKSGAdj = BarkHarmonized/VtotbkGross/62.4
+BKSGAdj = 365.436666110811/13.191436232306/62.4
+= 0.4439514186
+The adjusted wood density can convert any stem
+wood volume subcomponents (e.g., merchantable
+or sawlog portion of the stem) to weights compatible
+with the harmonized total stem wood weight. The
+adjusted bark density can similarly be used to
+convert any stem bark volume subcomponents to
+weights compatible with the harmonized total stem
+bark weight. Merchantable stem wood and bark
+weights can be determined using the same volume
+basis (e.g., Gross) as above for the adjusted specific
+gravity calculations:
+Wmerib = VmeribGross × WDSGAdj
+× 62.4
+Wmerib = 85.728641209612 × 0.454545207473
+× 62.4 = 2431.57468351127
+Wmerbk = VmerbkGross × BKSGAdj
+× 62.4
+Wmerbk = 12.785243758174 × 0.4439514186 × 62.4
+= 354.184091263592
+The merchantable stem outside-bark weight is then
+calculated via addition:
+Wmerob = Wmerib + Wmerbk
+Wmerob = 2431.57468351127 + 354.184091263592
+= 2785.75877477486
+Wmerob is equivalent in definition to the FIADB
+variable DRYBIO_BOLE (dry biomass in the
+merchantable bole). Similarly, stump weights are
+calculated as follows:
+Wstumpib = VstumpibGross × WDSGAdj
+× 62.4
+
+Wstumpib = 2.140395539869 × 0.454545207473
+× 62.4 = 60.709367768006
+Wstumpbk = VstumpbkGross × BKSGAdj
+× 62.4
+Wstumpbk = 0.319210456739 × 0.4439514186 × 62.4
+= 8.842949550309
+Wstumpob = Wstumpib + Wstumpbk
+Wstumpob = 60.709367768006 + 8.842949550309
+= 69.552317318315
+Wstumpob is equivalent in definition to the FIADB
+variable DRYBIO_STUMP (dry biomass in the tree
+stump).
+The NSVB component analogous to the current
+FIADB component DRYBIO_TOP (dry biomass in the
+top and branches of the tree) is the total AGB minus
+the merchantable stem components and the stump:
+DRYBIO
+_
+TOP = AGBPredictedred – Wmerob – Wstumpob
+DRYBIO
+TOP = 3154.5539926725
+_
+– 2785.75877477486 – 69.552317318315
+= 299.242900579325
+As the sum of the biomass components is equal to
+AGBPredictedred, the carbon content (C) of the stem
+and branches (but not foliage) is obtained via
+multiplication by the appropriate C fraction for SPCD
+= 202 (table S10a):
+C = AGBPredictedred × CF
+C = 3154.5539926725 × 0.515595833333
+= 1626.474894645920

@@ -1,810 +1,1035 @@
+"""
+Tests for the NSVB estimators against the four worked GTR examples.
+
+Every NSVB step shown in the GTR examples gets its own ``Test...`` class
+with two tests:
+
+  * a parametrized scalar test that calls the estimator with Python floats /
+    ints / strs once per tree (skipped when that example doesn't print the
+    quantity), and
+  * a vectorized test that passes parallel numpy arrays for all 4 trees in
+    one call and asserts only against the indices the GTR exercises.
+
+Both tests use ``np.testing.assert_allclose(rtol=1e-6)`` -- tight enough to
+catch real bugs, loose enough to tolerate the GTR's 12-decimal rounding and
+ordinary floating-point reassociation.
+
+Tests targeting estimators that are still stubs (``NotImplementedError``)
+fail today and serve as the working spec for the rest of the
+implementation. Once a stub is replaced with a real implementation, the
+test should pass without modification.
+"""
+
 import numpy as np
+import pytest
 
 from nsvb.estimators import (
-    total_inside_bark_wood_volume,
-    total_bark_wood_volume,
-    total_stem_wood_dry_weight,
-    total_stem_bark_weight,
-    total_branch_weight,
+    # implemented
     total_aboveground_biomass,
+    total_bark_wood_volume,
+    total_branch_weight,
     total_foliage_dry_weight,
+    total_inside_bark_wood_volume,
+    total_outside_bark_volume,
+    total_stem_bark_weight,
+    total_stem_wood_dry_weight,
+    # stubs -- step 4
+    merchantable_height,
+    sawlog_height,
+    # stubs -- step 5
+    broken_top_volume_ratio,
+    merchantable_volume_ratio,
+    sawlog_volume_ratio,
+    stump_volume_ratio,
+    # stubs -- step 6 (gross)
+    merchantable_bark_volume,
+    merchantable_inside_bark_volume,
+    merchantable_outside_bark_volume,
+    missing_bark_volume,
+    missing_inside_bark_volume,
+    missing_outside_bark_volume,
+    sawlog_bark_volume,
+    sawlog_inside_bark_volume,
+    sawlog_outside_bark_volume,
+    stump_bark_volume,
+    stump_inside_bark_volume,
+    stump_outside_bark_volume,
+    top_bark_volume,
+    top_inside_bark_volume,
+    top_outside_bark_volume,
+    # stubs -- step 6 (sound)
+    merchantable_bark_volume_sound,
+    merchantable_inside_bark_volume_sound,
+    merchantable_outside_bark_volume_sound,
+    stump_inside_bark_volume_sound,
+    stump_outside_bark_volume_sound,
+    top_bark_volume_sound,
+    top_inside_bark_volume_sound,
+    top_outside_bark_volume_sound,
+    total_bark_volume_sound,
+    total_inside_bark_wood_volume_sound,
+    total_outside_bark_volume_sound,
+    # stubs -- step 7-9 reduced
+    total_stem_wood_dry_weight_reduced,
+    total_stem_bark_weight_reduced,
+    total_stem_outside_bark_weight_reduced,
+    branch_remainder,
+    crown_ratio_at_h,
+    foliage_remainder,
+    total_branch_weight_reduced,
+    # stubs -- step 11-12 harmonization
+    agb_component_reduced,
+    agb_difference,
+    agb_predicted_reduced,
+    agb_reduce_factor,
+    harmonized_bark,
+    harmonized_branch,
+    harmonized_wood,
+    # stubs -- step 13 adjusted densities
+    adjusted_bark_density,
+    adjusted_wood_density,
+    # stubs -- step 14 merchantable / stump weights
+    merchantable_bark_weight,
+    merchantable_outside_bark_weight,
+    merchantable_wood_weight,
+    stump_bark_weight,
+    stump_outside_bark_weight,
+    stump_wood_weight,
+    # stubs -- step 15 reduced
+    total_foliage_dry_weight_reduced,
+    # stubs -- step 16-17
+    carbon_content,
+    drybio_top,
+)
+
+from tests.fixtures import CRH, INPUTS, TREES, expected_array, tree_crh
+
+RTOL = 1e-6
+TREE_IDS = [f"tree{t.id}" for t in TREES]
+
+# Some quantities cannot be reproduced from the published supplementary CSV
+# to the same precision as the GTR text examples, for two documented
+# reasons:
+#   * Ten S2a/S6a/S7a rows are stored in Excel scientific notation truncating
+#     ``a`` to 3 sig figs (e.g. ``3.19E-05`` vs the GTR text's
+#     ``0.000031886237``). For S2a SPCD=202/DIV=240 this causes ~4e-4
+#     relative drift in bark / outside-bark quantities for Tree 1.
+#   * The GTR's iterative h_m / h_s values were under-converged by the
+#     publication (residual ~3e-6 in eqn 7 at the printed values); our
+#     brentq finds the true root, so we differ by ~1e-6 relative -- which
+#     then propagates into the small ``v_top_*`` subcomponents.
+# Both are publication-precision limits, not bugs. Affected test classes
+# override ``rtol`` below with a comment citing the cause.
+RTOL_PUB_BARK = 1e-3   # Tree 1 S2a coefficient truncation propagation
+RTOL_PUB_ITER = 5e-6   # h_m/h_s under-convergence propagation
+# v_top_*_sound for broken-top trees: the residual (R_b - R_m) is tiny
+# (e.g. Tree 4: ~0.003), so the h_m drift amplifies into ~2e-5 relative.
+RTOL_PUB_SOUND = 5e-5
+
+
+def _check_scalar(tree, field_name, fn, *args, rtol=RTOL):
+    """Run ``fn(*args)`` as scalars; assert against ``tree.expected.<field>``."""
+    expected = getattr(tree.expected, field_name)
+    if expected is None:
+        pytest.skip(f"Tree {tree.id} does not exercise {field_name}")
+    result = fn(*args)
+    np.testing.assert_allclose(result, expected, rtol=rtol)
+
+
+def _check_vector(field_name, fn, *args, rtol=RTOL):
+    """Run ``fn(*args)`` on full input arrays; assert against masked expected."""
+    result = fn(*args)
+    expected, mask = expected_array(field_name)
+    assert isinstance(result, np.ndarray), "vectorized call must return ndarray"
+    assert result.shape == expected.shape, (
+        f"shape mismatch: result={result.shape} expected={expected.shape}"
+    )
+    np.testing.assert_allclose(result[mask], expected[mask], rtol=rtol)
+
+
+# Shortcut bundles -- the input combinations that recur across tests.
+_TREE_DIA_HT_DIV = lambda t: (t.spcd, t.dia, t.ht, t.division)
+_INPUT_DIA_HT_DIV = (INPUTS["spcd"], INPUTS["dia"], INPUTS["ht"], INPUTS["division"])
+_TREE_FULL = lambda t: (
+    t.spcd, t.dia, t.ht, t.division, t.cull, t.ah, t.decaycd, t.cr, t.province or "",
+)
+_INPUT_FULL = (
+    INPUTS["spcd"], INPUTS["dia"], INPUTS["ht"], INPUTS["division"],
+    INPUTS["cull"], INPUTS["ah"], INPUTS["decaycd"], INPUTS["cr"], INPUTS["province"],
 )
 
 
-class TestExample1:
-    """
-    Runs tests on Example 1 in the GTR.
+# =============================================================================
+# Step 1 -- total inside-bark wood volume (S1)
+# =============================================================================
+class TestTotalInsideBarkWoodVolume:
+    field = "v_tot_ib_gross"
 
-    Example 1 is described as:
-    Assume the following measurements were taken for
-    a Douglas-fir (Pseudotsuga menziesii; SPCD = 202)
-    tree having D = 20.0 inches and H = 110 feet with
-    no cull growing in the Marine Division (DIVISION
-    = 240).
-    """
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, total_inside_bark_wood_volume, *_TREE_DIA_HT_DIV(tree))
 
-    spcd = 202
-    dia = 20.0
-    ht = 110
-    division = "240"
+    def test_vector(self):
+        _check_vector(self.field, total_inside_bark_wood_volume, *_INPUT_DIA_HT_DIV)
 
-    def test_inside_bark_wood_volume(self):
-        """
-        The inside-bark wood volume
-        coefficient table (table S1a) indicates trees in the
-        group 202/240 (i.e., SPCD = 202 and DIVISION = 240)
-        use model 2 with the appropriate coefficients:
-        VtotibGross = a × k(b – b1) × Db1 × Hc
-        VtotibGross = 0.001929099661
-        × 9(2.162413104203 – 1.690400253097) × 201.690400253097
-        × 1100.985444005253 = 88.452275544288
 
-        I get 88.45229093648126 due to floating point precision.
-        """
-        assert (
-            total_inside_bark_wood_volume(self.spcd, self.dia, self.ht, self.division)
-            == 88.45229093648126
+# =============================================================================
+# Step 2 -- total bark volume (S2)
+# =============================================================================
+class TestTotalBarkWoodVolume:
+    field = "v_tot_bk_gross"
+    # Tree 1 (SPCD 202 / DIV 240): S2a stores a=3.19E-05 (3 sig figs); GTR
+    # text used a=0.000031886237. Worst-case ~4e-4 relative.
+    rtol = RTOL_PUB_BARK
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, total_bark_wood_volume, *_TREE_DIA_HT_DIV(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, total_bark_wood_volume, *_INPUT_DIA_HT_DIV, rtol=self.rtol)
+
+
+# =============================================================================
+# Step 3 -- total outside-bark volume (S1 + S2)
+# =============================================================================
+class TestTotalOutsideBarkVolume:
+    field = "v_tot_ob_gross"
+    rtol = RTOL_PUB_BARK   # bark precision propagates via v_tot_ib + v_tot_bk
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, total_outside_bark_volume, *_TREE_DIA_HT_DIV(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, total_outside_bark_volume, *_INPUT_DIA_HT_DIV, rtol=self.rtol)
+
+
+# =============================================================================
+# Step 4 -- merchantable & sawlog heights (S3 + S4, inverted iteratively)
+# =============================================================================
+class TestMerchantableHeight:
+    field = "h_m"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, merchantable_height, *_TREE_DIA_HT_DIV(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, merchantable_height, *_INPUT_DIA_HT_DIV)
+
+
+class TestSawlogHeight:
+    field = "h_s"
+    # GTR's printed h_s values are under-converged iterates (residual ~3e-6
+    # in eqn 7 at GTR's printed values); brentq finds the true root.
+    rtol = RTOL_PUB_ITER
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, sawlog_height, *_TREE_DIA_HT_DIV(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, sawlog_height, *_INPUT_DIA_HT_DIV, rtol=self.rtol)
+
+
+# =============================================================================
+# Step 5 -- stem-profile volume ratios (S5)
+# =============================================================================
+class TestStumpVolumeRatio:
+    field = "r_1"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, stump_volume_ratio, *_TREE_DIA_HT_DIV(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, stump_volume_ratio, *_INPUT_DIA_HT_DIV)
+
+
+class TestMerchantableVolumeRatio:
+    field = "r_m"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, merchantable_volume_ratio, *_TREE_DIA_HT_DIV(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, merchantable_volume_ratio, *_INPUT_DIA_HT_DIV)
+
+
+class TestSawlogVolumeRatio:
+    field = "r_s"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, sawlog_volume_ratio, *_TREE_DIA_HT_DIV(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, sawlog_volume_ratio, *_INPUT_DIA_HT_DIV)
+
+
+class TestBrokenTopVolumeRatio:
+    """R_b -- evaluated at AH for broken-top trees."""
+    field = "r_b"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(
+            tree, self.field, broken_top_volume_ratio,
+            tree.spcd, tree.dia, tree.ht, tree.division, tree.ah,
         )
 
-    def test_total_bark_wood_volume(self):
-        """
-        Total bark volume is predicted next. Consulting the
-        bark volume coefficient table (table S2a) indicates
-        the use of model 1 with the appropriate coefficients:
-        VtotbkGross = a × Db × Hc
-        VtotbkGross = 0.000031886237 × 201.21260513951
-        × 1101.978577263767 = 13.191436232306
-
-        I get 13.197130062388565 due to floating point precision.
-        """
-        assert (
-            total_bark_wood_volume(self.spcd, self.dia, self.ht, self.division)
-            == 13.197130062388565
-        )
-
-    def test_total_stem_wood_dry_weight(self):
-        """
-        Total stem wood volume is converted to total stem
-        wood dry weight in pounds (lb) using the wood
-        density (specific gravity) value from the FIADB
-        REF_SPECIES table, which is 0.45 for SPCD = 202. To
-        convert volume to weight, multiply this value by the
-        weight of a cubic foot of water (62.4 lb/ft3):
-        Wtotib = VtotibGross × WDSG × 62.4
-        Wtotib = 88.452275544288 × 0.45 × 62.4
-        = 2483.739897283610
-
-        I get 2483.7403294963938 due to floating point precision.
-        """
-        assert (
-            total_stem_wood_dry_weight(self.spcd, self.dia, self.ht, self.division)
-            == 2483.7403294963938
-        )
-
-    def test_total_stem_bark_weight(self):
-        """
-        Next, total stem bark weight can be estimated
-        using the appropriate model form and coefficients.
-        Consulting the stem bark weight coefficient table
-        (table S6a), use model 1 with the appropriate
-        coefficients:
-        Wtotbk = a × Db × Hc
-        Wtotbk = 0.009106538193 × 201.437894424586
-        × 1101.336514272981 = 361.782496100100
-
-        I get 361.7824889136451 due to floating point precision.
-        """
-        assert (
-            total_stem_bark_weight(self.spcd, self.dia, self.ht, self.division)
-            == 361.7824889136451
-        )
-
-    def test_total_branch_weight(self):
-        """
-        Total branch weight can then be estimated using the
-        appropriate model form and coefficients. Consulting
-        the branch weight coefficient table (table S7a), use
-        model 1 with the appropriate coefficients:
-        Wbranch = a × Db × Hc
-        Wbranch = 9.521330809106 × 201.762316117442
-        × 110-0.40574259177 = 277.487756904646
-
-        I get 277.4877562341372 due to floating point precision.
-        """
-        assert (
-            total_branch_weight(self.spcd, self.dia, self.ht, self.division)
-            == 277.4877562341372
-        )
-
-    def test_total_aboveground_biomass(self):
-        """
-        Now, total aboveground biomass (AGB) can be
-        estimated using the appropriate equation form and
-        coefficients. The total biomass coefficient table
-        (table S8a) prescribes the use of model 1 with the
-        appropriate coefficients:
-        AGBPredicted = a × Db × Hc
-        AGBPredicted = 0.135206506787 × 201.713527048035
-        × 1101.047613377046 = 3154.5539926725
-
-        I get 3154.553996629238 due to floating point precision.
-        """
-        assert (
-            total_aboveground_biomass(self.spcd, self.dia, self.ht, self.division)
-            == 3154.553996629238
-        )
-
-    def test_total_foliage_dry_weight(self):
-        """
-        Consulting the foliage weight
-        coefficient table (table S9) indicates the use of model
-        2 with the appropriate coefficients:
-        Wfoliage = a × k(b – b1) × Db1 × Hc
-        Wfoliage = 0.477184595914 × 9(2.592670351881 – 1.249237428914)
-        × 201.249237428914 ×110-0.325050455055 = 83.634788855934
-
-        I get 83.63478892024017 due to floating point precision.
-        """
-        assert (
-            total_foliage_dry_weight(self.spcd, self.dia, self.ht, self.division)
-            == 83.63478892024017
+    def test_vector(self):
+        _check_vector(
+            self.field, broken_top_volume_ratio,
+            INPUTS["spcd"], INPUTS["dia"], INPUTS["ht"], INPUTS["division"], INPUTS["ah"],
         )
 
 
-class TestExample2:
-    """
-    Assume a red maple (Acer rubrum; SPCD = 316)
-    tree with D = 11.1 inches, H = 38 feet, and CULL = 3
-    percent growing in the Warm Continental Mountains
-    (DIVISION = M210).
-    """
+# =============================================================================
+# Step 6 -- subcomponent volumes (gross)
+# =============================================================================
+class TestMerchantableInsideBarkVolume:
+    field = "v_mer_ib_gross"
 
-    spcd = 316
-    dia = 11.1
-    ht = 38
-    cull = 3
-    division = "M210"
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, merchantable_inside_bark_volume, *_TREE_DIA_HT_DIV(tree))
 
-    def test_inside_bark_wood_volume(self):
-        """
-        Consulting the inside-bark
-        wood volume coefficient table (table S1a), there are
-        no coefficients for the SPCD/DIVISION combination of
-        316/M210. Therefore, the species-level coefficients
-        are to be used. Use model 1 with the appropriate
-        coefficients:
-        VtotibGross = a × Db × Hc
-        VtotibGross = 0.001983918881 × 11.11.810559393287
-        × 381.129417635145 = 9.427112777611
+    def test_vector(self):
+        _check_vector(self.field, merchantable_inside_bark_volume, *_INPUT_DIA_HT_DIV)
 
-        I get 9.42711333158677 due to floating point precision.
-        """
-        assert (
-            total_inside_bark_wood_volume(self.spcd, self.dia, self.ht, self.division)
-            == 9.42711333158677
+
+class TestMerchantableBarkVolume:
+    field = "v_mer_bk_gross"
+    rtol = RTOL_PUB_BARK   # Tree 1 S2a precision propagates through v_tot_bk
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, merchantable_bark_volume, *_TREE_DIA_HT_DIV(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, merchantable_bark_volume, *_INPUT_DIA_HT_DIV, rtol=self.rtol)
+
+
+class TestMerchantableOutsideBarkVolume:
+    field = "v_mer_ob_gross"
+    rtol = RTOL_PUB_BARK   # Tree 1 S2a precision propagates through v_tot_ob
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, merchantable_outside_bark_volume, *_TREE_DIA_HT_DIV(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, merchantable_outside_bark_volume, *_INPUT_DIA_HT_DIV, rtol=self.rtol)
+
+
+class TestSawlogInsideBarkVolume:
+    field = "v_saw_ib_gross"
+    rtol = RTOL_PUB_ITER   # h_s drift propagates to small v_saw_ib (Tree 2)
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, sawlog_inside_bark_volume, *_TREE_DIA_HT_DIV(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, sawlog_inside_bark_volume, *_INPUT_DIA_HT_DIV, rtol=self.rtol)
+
+
+class TestSawlogBarkVolume:
+    field = "v_saw_bk_gross"
+    rtol = RTOL_PUB_BARK   # Tree 1 S2a propagation dominates
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, sawlog_bark_volume, *_TREE_DIA_HT_DIV(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, sawlog_bark_volume, *_INPUT_DIA_HT_DIV, rtol=self.rtol)
+
+
+class TestSawlogOutsideBarkVolume:
+    field = "v_saw_ob_gross"
+    rtol = RTOL_PUB_BARK   # Tree 1 S2a + Tree 2 h_s propagation
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, sawlog_outside_bark_volume, *_TREE_DIA_HT_DIV(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, sawlog_outside_bark_volume, *_INPUT_DIA_HT_DIV, rtol=self.rtol)
+
+
+class TestStumpInsideBarkVolume:
+    field = "v_stump_ib_gross"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, stump_inside_bark_volume, *_TREE_DIA_HT_DIV(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, stump_inside_bark_volume, *_INPUT_DIA_HT_DIV)
+
+
+class TestStumpBarkVolume:
+    field = "v_stump_bk_gross"
+    rtol = RTOL_PUB_BARK   # Tree 1 S2a propagation
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, stump_bark_volume, *_TREE_DIA_HT_DIV(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, stump_bark_volume, *_INPUT_DIA_HT_DIV, rtol=self.rtol)
+
+
+class TestStumpOutsideBarkVolume:
+    field = "v_stump_ob_gross"
+    rtol = RTOL_PUB_BARK   # Tree 1 S2a propagation
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, stump_outside_bark_volume, *_TREE_DIA_HT_DIV(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, stump_outside_bark_volume, *_INPUT_DIA_HT_DIV, rtol=self.rtol)
+
+
+class TestTopInsideBarkVolume:
+    field = "v_top_ib_gross"
+    # v_top_ib = v_tot_ib * (1 - r_m). Small h_m drift amplifies into the
+    # small top-volume residual (Trees 1, 2 ~2e-6 relative).
+    rtol = RTOL_PUB_ITER
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, top_inside_bark_volume, *_TREE_DIA_HT_DIV(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, top_inside_bark_volume, *_INPUT_DIA_HT_DIV, rtol=self.rtol)
+
+
+class TestTopBarkVolume:
+    field = "v_top_bk_gross"
+    rtol = RTOL_PUB_BARK   # Tree 1 S2a propagation dominates h_m drift
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, top_bark_volume, *_TREE_DIA_HT_DIV(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, top_bark_volume, *_INPUT_DIA_HT_DIV, rtol=self.rtol)
+
+
+class TestTopOutsideBarkVolume:
+    field = "v_top_ob_gross"
+    rtol = RTOL_PUB_BARK   # Tree 1 S2a propagation via v_tot_ob
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, top_outside_bark_volume, *_TREE_DIA_HT_DIV(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, top_outside_bark_volume, *_INPUT_DIA_HT_DIV, rtol=self.rtol)
+
+
+# =============================================================================
+# Step 6 -- missing-top volumes (broken-top trees only)
+# =============================================================================
+class TestMissingInsideBarkVolume:
+    field = "v_miss_ib_gross"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(
+            tree, self.field, missing_inside_bark_volume,
+            tree.spcd, tree.dia, tree.ht, tree.division, tree.ah,
         )
 
-    def test_total_bark_wood_volume(self):
-        """
-        Next, total bark volume will be predicted. Consulting
-        the bark volume coefficient table (table S2a), use
-        model 2 with the appropriate coefficients:
-        VtotbkGross = a × k(b – b1) × Db1 × Hc
-        VtotbkGross = 0.003743084443
-        × 11(2.226890355309 – 1.685993125661) × 11.11.685993125661
-        × 380.275066356213 = 2.155106401987
-
-        I get 2.1551061436670853 due to floating point precision.
-        """
-        assert (
-            total_bark_wood_volume(self.spcd, self.dia, self.ht, self.division)
-            == 2.1551061436670853
-        )
-
-    def test_total_stem_wood_dry_weight(self):
-        """
-        Total stem wood volume is converted to total stem
-        wood dry weight using the correct value from the
-        wood density table (FIADB REF_SPECIES table) in
-        conjunction with the weight of one cubic foot of
-        water (62.4 lb). Also, it is considered that most cull
-        will be rotten wood, which would still contribute to
-        the stem weight. As such, it is assumed the density of
-        cull wood is reduced by the proportion for DECAYCD
-        = 3 (see table 1; wood density proportion (DensProp)
-        is 0.54 for hardwood species and 0.92 for softwood
-        species) as reported by Harmon et al. (2011) to
-        obtain the reduced weight due to cull:
-        Wtotib = VtotibGross × WDSG × 62.4
-        Wtotib = 9.427112777611 × 0.49 × 62.4
-        = 288.243400288234
-
-        I get 288.2434172265971 due to floating point precision.
-
-        Wtotibred = VtotibGross × [1 – CULL/100
-        × (1 – DensProp)] × WDSG × 62.4
-        Wtotibred = 9.427112777611× [1 – 3/100 × (1 – 0.54)]
-        × 0.49 × 62.4 = 284.265641364256
-
-        I get 284.26565806887004 due to floating point precision.
-        """
-        # Test without cull
-        assert (
-            total_stem_wood_dry_weight(self.spcd, self.dia, self.ht, self.division)
-            == 288.2434172265971
-        )
-
-        # Test with cull
-        assert (
-            total_stem_wood_dry_weight(
-                self.spcd, self.dia, self.ht, self.division, cull=self.cull
-            )
-            == 284.26565806887004
-        )
-
-    def test_total_stem_bark_weight(self):
-        """
-        Total stem bark weight can be estimated by
-        consulting the stem bark weight coefficient table
-        (table S6a), which indicates the use of model 1 with
-        the appropriate coefficients. For live trees with intact
-        tops, no bark deductions are incurred:
-        Wtotbk = a × Db × Hc
-        Wtotbk = 0.061595466174 × 11.11.818642599217
-        × 380.654020672095 = 52.945466015848
-
-        Wtotbkred = Wtotbk = 52.945466015848
-
-        I get 52.94546582033252 due to floating point precision.
-        """
-        assert (
-            total_stem_bark_weight(self.spcd, self.dia, self.ht, self.division)
-            == 52.94546582033252
-        )
-
-    def test_total_branch_weight(self):
-        """
-        Total branch weight can then be estimated by
-        consulting the branch weight coefficient table (table
-        S7a), where the use of model 1 with the appropriate
-        coefficients is indicated. For live trees with intact
-        tops, no branch deductions are incurred:
-        Wbranch = a × Db × Hc
-        Wbranch = 0.011144618401 × 11.13.269520661293
-        × 380.421304343724 = 135.001927997271
-
-        Wbranchred = Wbranch = 135.001927997271
-
-        I get 135.00192318003036 due to floating point precision.
-        """
-        assert (
-            total_branch_weight(self.spcd, self.dia, self.ht, self.division)
-            == 135.00192318003036
-        )
-
-    def test_total_aboveground_biomass(self):
-        """
-        Total aboveground biomass can be estimated by
-        consulting the total biomass coefficient table (table
-        S8a) that stipulates the use of model 4 with the
-        appropriate coefficients:
-        AGBPredicted = a × Db × Hc × exp(-(b1× D))
-        AGBPredicted = 0.31573027567 × 11.11.853839844372
-        × 380.740557378679 × exp(-(-0.024745684975 × 11.1))
-        = 532.584798820042
-
-        I geet 532.5847996695031 due to floating point precision.
-        """
-        assert (
-            total_aboveground_biomass(self.spcd, self.dia, self.ht, self.division)
-            == 532.5847996695031
-        )
-
-    def test_total_foliage_dry_weight(self):
-        """
-        Foliage weight can be estimated using the foliage
-        weight coefficient table (table S9a), which prescribes
-        the use of model 1 with the appropriate coefficients:
-        Wfoliage = a × Db × Hc
-        Wfoliage = 0.850316556558 × 11.11.998961809584
-        × 38-0.418446486365 = 22.807960563788
-
-        I get 22.807960628763336 due to floating point precision.
-
-        Reductions to foliage weight are only considered
-        for live trees having a broken top. As no broken top
-        is present in the current example, Wfoliagered =
-        Wfoliage.
-        """
-        assert (
-            total_foliage_dry_weight(self.spcd, self.dia, self.ht, self.division)
-            == 22.807960628763336
+    def test_vector(self):
+        _check_vector(
+            self.field, missing_inside_bark_volume,
+            INPUTS["spcd"], INPUTS["dia"], INPUTS["ht"], INPUTS["division"], INPUTS["ah"],
         )
 
 
-class TestExample3:
-    """
-    Assume the following measurements were taken
-    for a dead (DECAYCD = 2) tanoak (Notholithocarpus
-    densiflorus; SPCD = 631) tree having D = 11.3 inches,
-    H = 28 feet, and a broken top (actual height AH = 21
-    feet) with CULL = 10 percent growing in the Marine
-    Mountains (DIVISION = M240, PROVINCE = M242).
-    Note that PROVINCE = M242 is a subarea within
-    DIVISION = M240 (Cleland et al. 2007, Nowacki
-    and Brock 1995), and the more spatially explicit
-    ecoprovince designation facilitates the use of table
-    S11 in the context of a dead tree with a broken top.
-    """
+class TestMissingBarkVolume:
+    field = "v_miss_bk_gross"
 
-    spcd = 631
-    dia = 11.3
-    ht = 28
-    ah = 21
-    cull = 10
-    division = "M240"
-    province = "M242"
-    decaycd = 2
-
-    def test_inside_bark_wood_volume(self):
-        """
-        The first step is to predict total stem wood volume
-        using the inside-bark wood volume coefficient
-        table (table S1b). There are no coefficients for the
-        SPCD/DIVISION combination of 631/M240 nor any
-        species-level coefficients. Therefore, the appropriate
-        Jenkins group (JENKINS_SPGRPCD) coefficients are
-        to be used. Tanoak is in the Other hardwoods group
-        (JENKINS_SPGRPCD = 8 as shown in the FIADB REF_
-        SPECIES table). Use model 1 with the appropriate
-        coefficients:
-        VtotibGross = a × Db × Hc
-        VtotibGross = 0.002340041369 × 11.31.89458735401
-        × 281.035094060155 = 7.283117547652
-
-        I got 7.283116395242574 due to floating point precision.
-        """
-        assert (
-            total_inside_bark_wood_volume(self.spcd, self.dia, self.ht, self.division)
-            == 7.283116395242574
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(
+            tree, self.field, missing_bark_volume,
+            tree.spcd, tree.dia, tree.ht, tree.division, tree.ah,
         )
 
-    def test_total_bark_wood_volume(self):
-        """
-        Total bark volume is predicted by consulting the bark
-        volume coefficient table (table S2b), which indicates
-        the use of model 1 with the appropriate coefficients:
-        VtotbkGross = a × Db × Hc
-        VtotbkGross = 0.001879520673 × 11.31.721074101914
-        × 280.825002196089 = 1.907136145131
-
-        I got 1.9071364767677488 due to floating point precision.
-        """
-        assert (
-            total_bark_wood_volume(self.spcd, self.dia, self.ht, self.division)
-            == 1.9071364767677488
-        )
-
-    def test_total_stem_wood_dry_weight(self):
-        """
-        Total stem wood volume is next converted to total
-        stem wood dry weight (lb) using the correct WDSG
-        value from the FIADB REF_SPECIES table and the
-        water weight conversion factor (62.4 lb/ft3):
-        Wtotib = VtotibGross × WDSG × 62.4
-        Wtotib = 7.283117547652 × 0.58 × 62.4
-        = 263.590590284621
-
-        I got 263.59054857661926 due to floating point precision.
-
-        A second calculation accounts for the broken
-        top and the dead tree density reduction (table 1)
-        associated with DECAYCD = 2 for this tree. While the
-        inside-bark weight includes the weight loss for wood
-        cull (CULL) in live trees, cull weight is not included
-        for dead trees as it is considered to be already
-        accounted for by the density reduction:
-        Wtotibred = VtotibSound/(1 – CULL/100) × WDSG
-        × DensProp × 62.4
-        Wtotibred = 6.345490374317/(1 – 10/100) × 0.58 × 0.8
-        × 62.4 = 204.13865566837
-        """
-        # Test without broken top and dead tree density reduction
-        assert (
-            total_stem_wood_dry_weight(self.spcd, self.dia, self.ht, self.division)
-            == 263.59054857661926
-        )
-
-    def test_total_stem_bark_weight(self):
-        """
-        Total stem bark weight can be estimated by
-        consulting the stem bark weight coefficient table
-        (table S6b), which indicates the use of model 1 with
-        the appropriate coefficients. Also, calculate the value
-        for the proportion of the stem remaining (via R
-        m
-        in
-        this case) while incorporating a density reduction
-        factor for dead trees and the remaining bark
-        proportion (BarkProp) (table 1):
-        Wtotbk = a × Db × Hc
-        Wtotbk = (0.06020544773 × 11.31.933727566198
-        × 280.590397069325) = 46.816664266025
-
-        I got 46.81666440280295 due to floating point precision.
-
-        Wtotbkred = Wtotbk × Rm × DensProp × BarkProp
-        Wtotbkred = 46.816664266025 × 0.968066877159
-        × 0.8 × 0.8 = 29.005863664008
-        """
-        # test without broken top and dead tree density reduction
-        assert (
-            total_stem_bark_weight(self.spcd, self.dia, self.ht, self.division)
-            == 46.81666440280295
-        )
-
-    def test_total_branch_weight(self):
-        """
-        Consulting the branch weight coefficient table
-        (table S7b), use model 5 with the appropriate
-        coefficients and WDSG value to estimate total branch
-        weight. Subsequently, also use table 1 to account
-        for the remaining dead tree branch proportion
-        (BranchProp), dead tree wood density reduction
-        (DensProp), and branches remaining due to the
-        broken top (BranchRem). The latter adjustment
-        requires consulting the crown ratio table (table S11)
-        to assume the proportion of the stem having branch
-        wood, which indicates the expected crown ratio
-        calculated from live trees by hardwood vs. softwood
-        species classification and PROVINCE.
-        Wbranch= a × Db × Hc × WDSG
-        Wbranch = 0.798604849948 × 11.32.969162133333
-        × 28-0.301902411279 × 0.58 = 226.788002348975
-
-        I got 226.78800239146196 due to floating point precision.
-
-        BranchRem = [AH – H × (1 – CR)]/(H × CR)
-        BranchRem = [21 – 28 × (1 – 0.378)]/(28 × 0.378)
-        = 0.338624338624
-        Wbranchred = Wbranch × DensProp × BranchProp
-        × BranchRem
-        Wbranchred = 226.788002348975 × 0.8 × 0.5
-        × 0.338624338624 = 30.718374921312
-        """
-        # test without broken top and dead tree density reduction
-        assert (
-            total_branch_weight(self.spcd, self.dia, self.ht, self.division)
-            == 226.78800239146196
-        )
-
-    def test_total_aboveground_biomass(self):
-        """
-        Total aboveground biomass can be estimated by
-        consulting the total biomass coefficient table (table
-        S8b), which specifies the use of model 5 with the
-        appropriate coefficients. Again, as Jenkins group
-        coefficients are being used, multiplication by specific
-        gravity (WDSG) is required:
-        AGBPredicted = a × Db × Hc × WDSG
-        AGBPredicted = 0.433906440864 × 11.32.115626101921
-        × 280.735074517922 × 0.58 = 492.621457718427
-
-        I got 492.6214580952344 due to floating point precision.
-        """
-        assert (
-            total_aboveground_biomass(self.spcd, self.dia, self.ht, self.division)
-            == 492.6214580952344
-        )
-
-    def test_total_foliage_dry_weight(self):
-        """
-        In the case of dead trees, foliage weight is assumed
-        to be zero:
-        Wfoliage = 0
-        """
-
-
-class TestExample4:
-    """
-    Assume the following measurements were taken
-    for a live white oak (Quercus alba; SPCD = 802) tree
-    having D = 18.1 inches, H = 65 feet, a broken top
-    (actual height (AH) = 59 feet), CULL = 2 percent, and
-    a crown ratio of 30 percent (CR = 30) growing in the
-    Hot Continental Mountains (DIVISION = M220).
-    """
-
-    spcd = 802
-    dia = 18.1
-    ht = 65
-    ah = 59
-    cull = 2
-    cr = 30
-    division = "M220"
-
-    def test_inside_bark_wood_volume(self):
-        """
-        The first step is to predict total inside-bark stem
-        wood volume by consulting the inside-bark wood
-        volume coefficient table (table S1a). There are
-        coefficients given for the SPCD/DIVISION combination
-        of 802/M220 along with the specification to use
-        model 1:
-        VtotibGross = a × Db × Hc
-        VtotibGross = 0.002062931814 × 18.11.852527628718
-        × 651.09312644716 = 42.277832913225
-
-        I get 42.27783673140729 due to floating point precision.
-        """
-        assert (
-            total_inside_bark_wood_volume(self.spcd, self.dia, self.ht, self.division)
-            == 42.27783673140729
-        )
-
-    def test_total_bark_wood_volume(self):
-        """
-        Total bark volume is accomplished by consulting
-        the bark volume coefficient table (table S2a), which
-        indicates the use of model 2 with the appropriate
-        coefficients:
-        VtotbkGross = a × k(b – b1) × Db1 × Hc
-        VtotbkGross = 0.002020025979 × 11(1.957775262905
-        – 1.618455676343) × 18.11.618455676343 × 650.677400740385
-        = 8.361568823386
-
-        I get 8.361568897350095 due to floating point precision.
-        """
-        assert (
-            total_bark_wood_volume(self.spcd, self.dia, self.ht, self.division)
-            == 8.361568897350095
-        )
-
-    def test_total_stem_wood_dry_weight(self):
-        """
-        Total stem wood volume is next converted to total
-        stem wood dry weight using the wood density value
-        from the FIADB REF_SPECIES table. It is considered
-        that some cull will be rotten wood, which would
-        still contribute to the stem weight. As such, it is
-        assumed the density of cull wood is reduced by
-        the proportion for DECAYCD = 3 (see table 1; wood
-        density proportion (DensProp) is 0.54 for hardwood
-        species, 0.92 for softwood species) as reported by
-        Harmon et al. (2011) to obtain the reduced weight
-        due to cull. The weight is also reduced to account for
-        missing top wood:
-        Wtotib = VtotibGross × WDSG × 62.4
-        Wtotib = 42.277832913225 × 0.60 × 62.4
-        = 1582.882064271140
-
-        I get 1582.8822072238888 due to floating point precision.
-
-        Wtotibred = (VtotibGross – VmissibGross)
-        × [1 – CULL/100 × (1 – DensProp)] × WDSG × 62.4
-        Wtotibred = (42.277832913225 – 0.099795127559)
-        × [1 – 2/100 × (1 – 0.54)] × 0.60 × 62.4
-        = 1564.617593936140
-        """
-        # Test without cull and without the missing top
-        assert (
-            total_stem_wood_dry_weight(self.spcd, self.dia, self.ht, self.division)
-            == 1582.8822072238888
-        )
-        #
-        # # Test with cull
-        # assert (
-        #     total_stem_wood_dry_weight(
-        #         self.spcd, self.dia, self.ht, self.division, cull=self.cull
-        #     )
-        #     == 1564.617593936140
-        # )
-
-    def test_total_stem_bark_weight(self):
-        """
-        Next, total stem bark weight can be estimated by
-        consulting the stem bark weight coefficient table
-        (table S6a), which specifies to use model 2 with the
-        appropriate coefficients. Also, calculate the value for
-        the proportion of the stem remaining (via Rb in this
-        case):
-        Wtotbk = a × k(b – b1) × D b1 × Hc
-        Wtotbk = 0.013653815808 × 11(2.255437355705 – 1.777569692133)
-        × 18.11.777569692133 × 650.830992810735 = 237.154413924445
-
-        I get 237.1544176737046 due to floating point precision.
-
-        Wtotbkred = (a × k(b – b1) × D b1 × Hc) × Rb
-        Wtotbkred = (0.013653815808 × 11(2.255437355705
-        – 1.777569692133) × 18.11.777569692133 × 650.830992810735)
-        × 0.997639540140 = 236.594620449755
-        """
-        # Test without the missing top
-        assert (
-            total_stem_bark_weight(self.spcd, self.dia, self.ht, self.division)
-            == 237.1544176737046
-        )
-
-    def test_total_branch_weight(self):
-        """
-        Consulting the branch weight coefficient table (table
-        S7a), use model 1 with the appropriate coefficients
-        to estimate total branch weight. Additionally,
-        account for the branches remaining due to the
-        broken top (BranchRem). The latter adjustment
-        requires use of the observed crown ratio (CR = 30
-        percent) based on AH to standardize the CR value to
-        H (CRH) and then assess the proportion of the branch
-        wood still intact:
-        Wbranch= a × Db × Hc
-        Wbranch = 0.003795934624 × 18.12.337549205679
-        × 651.30586951288 = 770.251512414918
-
-        I get 770.2515898127575 due to floating point precision.
-
-
-        CRH = [H – AH × (1 – CR)]/H
-        CRH = [65 – 59 × (1 – .30)]/65 = 0.364615384615
-        BranchRem =[(AH – H × (1 – CRH)]/(H × CRH)
-        BranchRem = [59 – 65 × (1 – 0.364615384615])/(65
-        × 0.364615384615) = 0.746835443038
-        Wbranchred = a × Db × Hc × BranchRem
-        Wbranchred = 0.003795934624 × 18.12.337549205679
-        × 651.30586951288 × 0.746835443038
-        = 575.250923828242
-        """
-        # Test without the missing top
-        assert (
-            total_branch_weight(self.spcd, self.dia, self.ht, self.division)
-            == 770.2515898127575
-        )
-
-    def test_total_foliage_dry_weight(self):
-        """
-        Foliage weight can be estimated by
-        consulting the foliage weight coefficient table (table
-        S9a), which stipulates the use of model 1 with the
-        appropriate coefficients:
-        Wfoliage = a × Db × Hc
-        Wfoliage = 0.03832401169 × 18.11.740655717258
-        × 650.500290321354 = 47.823281355886
-
-        I get 47.82328163632339 due to floating point precision.
-
-        As with branches, the weight of foliage needs to be
-        reduced to account for remaining portion after the
-        broken top loss:
-        FoliageRem = [AH – H × (1 – CRH)]/(H × CRH)
-        FoliageRem = [59 – 65 × (1 – 0.364615384615)]/
-        (65 × 0.364615384615) = 0.746835443038
-        Wfoliagered = Wfoliage × FoliageRem
-        Wfoliagered = 47.823281355886 × 0.746835443038
-        = 35.716121518954
-        """
-        # Test without the missing top
-        assert (
-            total_foliage_dry_weight(self.spcd, self.dia, self.ht, self.division)
-            == 47.82328163632339
+    def test_vector(self):
+        _check_vector(
+            self.field, missing_bark_volume,
+            INPUTS["spcd"], INPUTS["dia"], INPUTS["ht"], INPUTS["division"], INPUTS["ah"],
         )
 
 
-class TestVectorized:
-    """
-    Test vectorization by combining all 4 examples into arrays.
+class TestMissingOutsideBarkVolume:
+    field = "v_miss_ob_gross"
 
-    Uses the same trees from TestExample1-4:
-    - Example 1: Douglas-fir (spcd=202, dia=20.0, ht=110, division="240")
-    - Example 2: Red maple (spcd=316, dia=11.1, ht=38, division="M210", cull=3)
-    - Example 3: Tanoak (spcd=631, dia=11.3, ht=28, division="M240")
-    - Example 4: White oak (spcd=802, dia=18.1, ht=65, division="M220", cull=2)
-    """
-
-    # Arrays of all 4 examples
-    spcd = np.array([202, 316, 631, 802])
-    dia = np.array([20.0, 11.1, 11.3, 18.1])
-    ht = np.array([110, 38, 28, 65])
-    division = np.array(["240", "M210", "M240", "M220"])
-    cull = np.array([0, 3, 0, 2])  # Examples 1 and 3 have no cull
-
-    def test_inside_bark_wood_volume(self):
-        """Vectorized inside bark volume matches individual examples."""
-        result = total_inside_bark_wood_volume(self.spcd, self.dia, self.ht, self.division)
-
-        # Should return array
-        assert isinstance(result, np.ndarray)
-        assert len(result) == 4
-
-        # Should match each example's expected value
-        assert result[0] == 88.45229093648126  # Example 1
-        assert result[1] == 9.42711333158677   # Example 2
-        assert result[2] == 7.283116395242574  # Example 3
-        assert result[3] == 42.27783673140729  # Example 4
-
-    def test_total_bark_wood_volume(self):
-        """Vectorized bark volume matches individual examples."""
-        result = total_bark_wood_volume(self.spcd, self.dia, self.ht, self.division)
-
-        assert isinstance(result, np.ndarray)
-        assert len(result) == 4
-
-        assert result[0] == 13.197130062388565    # Example 1
-        assert result[1] == 2.1551061436670853    # Example 2
-        assert result[2] == 1.9071364767677488    # Example 3
-        assert result[3] == 8.361568897350095     # Example 4
-
-    def test_total_stem_wood_dry_weight(self):
-        """Vectorized stem wood weight matches individual examples."""
-        # Test without cull first
-        result_no_cull = total_stem_wood_dry_weight(
-            self.spcd, self.dia, self.ht, self.division
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(
+            tree, self.field, missing_outside_bark_volume,
+            tree.spcd, tree.dia, tree.ht, tree.division, tree.ah,
         )
 
-        assert isinstance(result_no_cull, np.ndarray)
-        assert len(result_no_cull) == 4
-
-        assert result_no_cull[0] == 2483.7403294963938  # Example 1
-        assert result_no_cull[1] == 288.2434172265971   # Example 2 (no cull)
-        assert result_no_cull[2] == 263.59054857661926  # Example 3
-        assert result_no_cull[3] == 1582.8822072238888  # Example 4 (no cull)
-
-        # Test with cull
-        result_with_cull = total_stem_wood_dry_weight(
-            self.spcd, self.dia, self.ht, self.division, self.cull
+    def test_vector(self):
+        _check_vector(
+            self.field, missing_outside_bark_volume,
+            INPUTS["spcd"], INPUTS["dia"], INPUTS["ht"], INPUTS["division"], INPUTS["ah"],
         )
 
-        assert isinstance(result_with_cull, np.ndarray)
-        assert len(result_with_cull) == 4
 
-        assert result_with_cull[0] == 2483.7403294963938  # Example 1 (cull=0)
-        assert result_with_cull[1] == 284.26565806887004  # Example 2 (cull=3)
-        assert result_with_cull[2] == 263.59054857661926  # Example 3 (cull=0)
-        # Example 4 with cull=2 commented out in original tests
-        # assert result_with_cull[3] == 1564.617593936140
+# =============================================================================
+# Step 6 -- sound volumes (cull + broken-top deductions)
+# =============================================================================
+_SOUND_TREE_ARGS = lambda t: (t.spcd, t.dia, t.ht, t.division, t.cull, t.ah, t.decaycd)
+_SOUND_INPUT_ARGS = (
+    INPUTS["spcd"], INPUTS["dia"], INPUTS["ht"], INPUTS["division"],
+    INPUTS["cull"], INPUTS["ah"], INPUTS["decaycd"],
+)
 
-    def test_total_stem_bark_weight(self):
-        """Vectorized stem bark weight matches individual examples."""
-        result = total_stem_bark_weight(self.spcd, self.dia, self.ht, self.division)
 
-        assert isinstance(result, np.ndarray)
-        assert len(result) == 4
+class TestTotalInsideBarkVolumeSound:
+    field = "v_tot_ib_sound"
 
-        assert result[0] == 361.7824889136451   # Example 1
-        assert result[1] == 52.94546582033252   # Example 2
-        assert result[2] == 46.81666440280295   # Example 3
-        assert result[3] == 237.1544176737046   # Example 4
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, total_inside_bark_wood_volume_sound, *_SOUND_TREE_ARGS(tree))
 
-    def test_total_branch_weight(self):
-        """Vectorized branch weight matches individual examples."""
-        result = total_branch_weight(self.spcd, self.dia, self.ht, self.division)
+    def test_vector(self):
+        _check_vector(self.field, total_inside_bark_wood_volume_sound, *_SOUND_INPUT_ARGS)
 
-        assert isinstance(result, np.ndarray)
-        assert len(result) == 4
 
-        assert result[0] == 277.4877562341372    # Example 1
-        assert result[1] == 135.00192318003036   # Example 2
-        assert result[2] == 226.78800239146196   # Example 3
-        assert result[3] == 770.2515898127575    # Example 4
+class TestTotalBarkVolumeSound:
+    field = "v_tot_bk_sound"
 
-    def test_total_aboveground_biomass(self):
-        """Vectorized total aboveground biomass matches individual examples."""
-        result = total_aboveground_biomass(self.spcd, self.dia, self.ht, self.division)
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, total_bark_volume_sound, *_SOUND_TREE_ARGS(tree))
 
-        assert isinstance(result, np.ndarray)
-        assert len(result) == 4
+    def test_vector(self):
+        _check_vector(self.field, total_bark_volume_sound, *_SOUND_INPUT_ARGS)
 
-        assert result[0] == 3154.553996629238   # Example 1
-        assert result[1] == 532.5847996695031   # Example 2
-        assert result[2] == 492.6214580952344   # Example 3
-        # Example 4 doesn't have test for total_aboveground_biomass
 
-    def test_total_foliage_dry_weight(self):
-        """Vectorized foliage weight matches individual examples."""
-        result = total_foliage_dry_weight(self.spcd, self.dia, self.ht, self.division)
+class TestTotalOutsideBarkVolumeSound:
+    field = "v_tot_ob_sound"
+    rtol = RTOL_PUB_BARK   # Tree 1 S2a propagation via v_tot_ob
 
-        assert isinstance(result, np.ndarray)
-        assert len(result) == 4
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, total_outside_bark_volume_sound, *_SOUND_TREE_ARGS(tree), rtol=self.rtol)
 
-        assert result[0] == 83.63478892024017   # Example 1
-        assert result[1] == 22.807960628763336  # Example 2
-        # Example 3 is dead tree, foliage = 0 (not tested in original)
-        assert result[3] == 47.82328163632339   # Example 4
+    def test_vector(self):
+        _check_vector(self.field, total_outside_bark_volume_sound, *_SOUND_INPUT_ARGS, rtol=self.rtol)
+
+
+class TestMerchantableInsideBarkVolumeSound:
+    field = "v_mer_ib_sound"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, merchantable_inside_bark_volume_sound, *_SOUND_TREE_ARGS(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, merchantable_inside_bark_volume_sound, *_SOUND_INPUT_ARGS)
+
+
+class TestMerchantableBarkVolumeSound:
+    field = "v_mer_bk_sound"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, merchantable_bark_volume_sound, *_SOUND_TREE_ARGS(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, merchantable_bark_volume_sound, *_SOUND_INPUT_ARGS)
+
+
+class TestMerchantableOutsideBarkVolumeSound:
+    field = "v_mer_ob_sound"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, merchantable_outside_bark_volume_sound, *_SOUND_TREE_ARGS(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, merchantable_outside_bark_volume_sound, *_SOUND_INPUT_ARGS)
+
+
+class TestStumpInsideBarkVolumeSound:
+    field = "v_stump_ib_sound"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, stump_inside_bark_volume_sound, *_SOUND_TREE_ARGS(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, stump_inside_bark_volume_sound, *_SOUND_INPUT_ARGS)
+
+
+class TestStumpOutsideBarkVolumeSound:
+    field = "v_stump_ob_sound"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, stump_outside_bark_volume_sound, *_SOUND_TREE_ARGS(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, stump_outside_bark_volume_sound, *_SOUND_INPUT_ARGS)
+
+
+class TestTopInsideBarkVolumeSound:
+    field = "v_top_ib_sound"
+    rtol = RTOL_PUB_SOUND   # Tree 4: small (R_b - R_m) amplifies h_m drift
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, top_inside_bark_volume_sound, *_SOUND_TREE_ARGS(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, top_inside_bark_volume_sound, *_SOUND_INPUT_ARGS, rtol=self.rtol)
+
+
+class TestTopBarkVolumeSound:
+    field = "v_top_bk_sound"
+    rtol = RTOL_PUB_SOUND   # Tree 4: small (R_b - R_m) amplifies h_m drift
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, top_bark_volume_sound, *_SOUND_TREE_ARGS(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, top_bark_volume_sound, *_SOUND_INPUT_ARGS, rtol=self.rtol)
+
+
+class TestTopOutsideBarkVolumeSound:
+    field = "v_top_ob_sound"
+    rtol = RTOL_PUB_SOUND   # same amplification as IB / BK counterparts
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, top_outside_bark_volume_sound, *_SOUND_TREE_ARGS(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, top_outside_bark_volume_sound, *_SOUND_INPUT_ARGS, rtol=self.rtol)
+
+
+# =============================================================================
+# Step 7 -- total stem wood dry weight (Wtotib + Wtotibred)
+# =============================================================================
+class TestTotalStemWoodDryWeight:
+    """Wtotib -- gross stem wood weight (no reductions)."""
+    field = "w_tot_ib"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, total_stem_wood_dry_weight, *_TREE_DIA_HT_DIV(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, total_stem_wood_dry_weight, *_INPUT_DIA_HT_DIV)
+
+
+class TestTotalStemWoodDryWeightReduced:
+    """Wtotibred -- with cull / dead density / broken-top reductions."""
+    field = "w_tot_ib_red"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(
+            tree, self.field, total_stem_wood_dry_weight_reduced,
+            tree.spcd, tree.dia, tree.ht, tree.division, tree.cull, tree.ah, tree.decaycd,
+        )
+
+    def test_vector(self):
+        _check_vector(
+            self.field, total_stem_wood_dry_weight_reduced,
+            INPUTS["spcd"], INPUTS["dia"], INPUTS["ht"], INPUTS["division"],
+            INPUTS["cull"], INPUTS["ah"], INPUTS["decaycd"],
+        )
+
+
+# =============================================================================
+# Step 8 -- total stem bark weight (Wtotbk + Wtotbkred + Wtotobred)
+# =============================================================================
+class TestTotalStemBarkWeight:
+    field = "w_tot_bk"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, total_stem_bark_weight, *_TREE_DIA_HT_DIV(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, total_stem_bark_weight, *_INPUT_DIA_HT_DIV)
+
+
+class TestTotalStemBarkWeightReduced:
+    field = "w_tot_bk_red"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(
+            tree, self.field, total_stem_bark_weight_reduced,
+            tree.spcd, tree.dia, tree.ht, tree.division, tree.ah, tree.decaycd,
+        )
+
+    def test_vector(self):
+        _check_vector(
+            self.field, total_stem_bark_weight_reduced,
+            INPUTS["spcd"], INPUTS["dia"], INPUTS["ht"], INPUTS["division"],
+            INPUTS["ah"], INPUTS["decaycd"],
+        )
+
+
+class TestTotalStemOutsideBarkWeightReduced:
+    field = "w_tot_ob_red"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(
+            tree, self.field, total_stem_outside_bark_weight_reduced,
+            tree.spcd, tree.dia, tree.ht, tree.division, tree.cull, tree.ah, tree.decaycd,
+        )
+
+    def test_vector(self):
+        _check_vector(
+            self.field, total_stem_outside_bark_weight_reduced,
+            INPUTS["spcd"], INPUTS["dia"], INPUTS["ht"], INPUTS["division"],
+            INPUTS["cull"], INPUTS["ah"], INPUTS["decaycd"],
+        )
+
+
+# =============================================================================
+# Step 9 -- total branch weight (Wbranch + Wbranchred + intermediates)
+# =============================================================================
+class TestTotalBranchWeight:
+    field = "w_branch"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, total_branch_weight, *_TREE_DIA_HT_DIV(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, total_branch_weight, *_INPUT_DIA_HT_DIV)
+
+
+class TestCrownRatioAtH:
+    field = "crh"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, crown_ratio_at_h, tree.ht, tree.ah, tree.cr)
+
+    def test_vector(self):
+        _check_vector(self.field, crown_ratio_at_h, INPUTS["ht"], INPUTS["ah"], INPUTS["cr"])
+
+
+class TestBranchRemainder:
+    """branch_remainder is the pure formula; the H-standardized CRH must be
+    resolved by the caller (here via :func:`tree_crh`)."""
+    field = "branch_rem"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, branch_remainder, tree.ht, tree.ah, tree_crh(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, branch_remainder, INPUTS["ht"], INPUTS["ah"], CRH)
+
+
+class TestFoliageRemainder:
+    field = "foliage_rem"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, foliage_remainder, tree.ht, tree.ah, tree_crh(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, foliage_remainder, INPUTS["ht"], INPUTS["ah"], CRH)
+
+
+class TestTotalBranchWeightReduced:
+    field = "w_branch_red"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(
+            tree, self.field, total_branch_weight_reduced,
+            tree.spcd, tree.dia, tree.ht, tree.division,
+            tree.ah, tree.decaycd, tree.cr, tree.province or "",
+        )
+
+    def test_vector(self):
+        _check_vector(
+            self.field, total_branch_weight_reduced,
+            INPUTS["spcd"], INPUTS["dia"], INPUTS["ht"], INPUTS["division"],
+            INPUTS["ah"], INPUTS["decaycd"], INPUTS["cr"], INPUTS["province"],
+        )
+
+
+# =============================================================================
+# Step 10 -- total aboveground biomass (S8, predicted)
+# =============================================================================
+class TestTotalAbovegroundBiomass:
+    field = "agb_predicted"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, total_aboveground_biomass, *_TREE_DIA_HT_DIV(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, total_aboveground_biomass, *_INPUT_DIA_HT_DIV)
+
+
+# =============================================================================
+# Step 11 -- AGB harmonization scalars
+# =============================================================================
+class TestAGBComponentReduced:
+    field = "agb_component_red"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, agb_component_reduced, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, agb_component_reduced, *_INPUT_FULL)
+
+
+class TestAGBReduceFactor:
+    field = "agb_reduce"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, agb_reduce_factor, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, agb_reduce_factor, *_INPUT_FULL)
+
+
+class TestAGBPredictedReduced:
+    field = "agb_predicted_red"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, agb_predicted_reduced, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, agb_predicted_reduced, *_INPUT_FULL)
+
+
+class TestAGBDifference:
+    field = "agb_diff"
+    # AGBDiff = AGBPredictedred - AGBComponentred -- small difference of
+    # two large nearly-equal numbers. For Tree 1 (~31 ft of difference on
+    # ~3154 lb totals), rtol=1e-6 in the inputs becomes ~1e-5 in the diff.
+    rtol = 5e-5
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, agb_difference, *_TREE_FULL(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, agb_difference, *_INPUT_FULL, rtol=self.rtol)
+
+
+# =============================================================================
+# Step 12 -- harmonized components
+# =============================================================================
+class TestHarmonizedWood:
+    field = "wood_harmonized"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, harmonized_wood, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, harmonized_wood, *_INPUT_FULL)
+
+
+class TestHarmonizedBark:
+    field = "bark_harmonized"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, harmonized_bark, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, harmonized_bark, *_INPUT_FULL)
+
+
+class TestHarmonizedBranch:
+    field = "branch_harmonized"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, harmonized_branch, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, harmonized_branch, *_INPUT_FULL)
+
+
+# =============================================================================
+# Step 13 -- adjusted densities
+# =============================================================================
+class TestAdjustedWoodDensity:
+    field = "wdsg_adj"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, adjusted_wood_density, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, adjusted_wood_density, *_INPUT_FULL)
+
+
+class TestAdjustedBarkDensity:
+    field = "bksg_adj"
+    # Tree 1: BKSGAdj = BarkHarmonized / V_tot_bk_basis / 62.4. The
+    # denominator V_tot_bk_basis inherits the S2a coefficient precision drift
+    # (~4e-4 relative) for SPCD 202 / DIV 240.
+    rtol = RTOL_PUB_BARK
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, adjusted_bark_density, *_TREE_FULL(tree), rtol=self.rtol)
+
+    def test_vector(self):
+        _check_vector(self.field, adjusted_bark_density, *_INPUT_FULL, rtol=self.rtol)
+
+
+# =============================================================================
+# Step 14 -- merchantable & stump weights
+# =============================================================================
+class TestMerchantableWoodWeight:
+    field = "w_mer_ib"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, merchantable_wood_weight, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, merchantable_wood_weight, *_INPUT_FULL)
+
+
+class TestMerchantableBarkWeight:
+    field = "w_mer_bk"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, merchantable_bark_weight, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, merchantable_bark_weight, *_INPUT_FULL)
+
+
+class TestMerchantableOutsideBarkWeight:
+    field = "w_mer_ob"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, merchantable_outside_bark_weight, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, merchantable_outside_bark_weight, *_INPUT_FULL)
+
+
+class TestStumpWoodWeight:
+    field = "w_stump_ib"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, stump_wood_weight, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, stump_wood_weight, *_INPUT_FULL)
+
+
+class TestStumpBarkWeight:
+    field = "w_stump_bk"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, stump_bark_weight, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, stump_bark_weight, *_INPUT_FULL)
+
+
+class TestStumpOutsideBarkWeight:
+    field = "w_stump_ob"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, stump_outside_bark_weight, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, stump_outside_bark_weight, *_INPUT_FULL)
+
+
+# =============================================================================
+# Step 15 -- foliage weight (Wfoliage + Wfoliagered)
+# =============================================================================
+class TestTotalFoliageDryWeight:
+    field = "w_foliage"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, total_foliage_dry_weight, *_TREE_DIA_HT_DIV(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, total_foliage_dry_weight, *_INPUT_DIA_HT_DIV)
+
+
+class TestTotalFoliageDryWeightReduced:
+    field = "w_foliage_red"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(
+            tree, self.field, total_foliage_dry_weight_reduced,
+            tree.spcd, tree.dia, tree.ht, tree.division,
+            tree.ah, tree.decaycd, tree.cr, tree.province or "",
+        )
+
+    def test_vector(self):
+        _check_vector(
+            self.field, total_foliage_dry_weight_reduced,
+            INPUTS["spcd"], INPUTS["dia"], INPUTS["ht"], INPUTS["division"],
+            INPUTS["ah"], INPUTS["decaycd"], INPUTS["cr"], INPUTS["province"],
+        )
+
+
+# =============================================================================
+# Step 16 -- DRYBIO_TOP
+# =============================================================================
+class TestDrybioTop:
+    field = "drybio_top"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, drybio_top, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, drybio_top, *_INPUT_FULL)
+
+
+# =============================================================================
+# Step 17 -- carbon content (S10)
+# =============================================================================
+class TestCarbonContent:
+    field = "c"
+
+    @pytest.mark.parametrize("tree", TREES, ids=TREE_IDS)
+    def test_scalar(self, tree):
+        _check_scalar(tree, self.field, carbon_content, *_TREE_FULL(tree))
+
+    def test_vector(self):
+        _check_vector(self.field, carbon_content, *_INPUT_FULL)
